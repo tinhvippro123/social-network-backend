@@ -1,6 +1,6 @@
 package com.vietblog.domain.service;
 
-import com.vietblog.domain.Post;
+import com.vietblog.domain.entity.Post;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;

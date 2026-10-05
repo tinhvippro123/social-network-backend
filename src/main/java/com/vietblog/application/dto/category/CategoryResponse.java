@@ -1,6 +1,6 @@
 package com.vietblog.application.dto.category;
 
-import com.vietblog.domain.Category;
+import com.vietblog.domain.entity.Category;
 import lombok.Builder;
 import lombok.Data;
 

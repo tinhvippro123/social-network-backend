@@ -2,9 +2,9 @@ package com.vietblog.application.service;
 
 import com.vietblog.application.dto.post.CreatePostRequest;
 import com.vietblog.application.dto.post.PostResponse;
-import com.vietblog.domain.Category;
-import com.vietblog.domain.Post;
-import com.vietblog.domain.User;
+import com.vietblog.domain.entity.Category;
+import com.vietblog.domain.entity.Post;
+import com.vietblog.domain.entity.User;
 import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.infrastructure.repository.CategoryRepository;
 import com.vietblog.infrastructure.repository.PostRepository;

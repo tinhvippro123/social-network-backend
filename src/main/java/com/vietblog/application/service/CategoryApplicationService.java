@@ -2,7 +2,7 @@ package com.vietblog.application.service;
 
 import com.vietblog.application.dto.category.CategoryResponse;
 import com.vietblog.application.dto.category.CreateCategoryRequest;
-import com.vietblog.domain.Category;
+import com.vietblog.domain.entity.Category;
 import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.domain.service.CategoryDomainService;

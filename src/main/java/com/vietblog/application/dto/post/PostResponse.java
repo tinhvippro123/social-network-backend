@@ -1,6 +1,6 @@
 package com.vietblog.application.dto.post;
 
-import com.vietblog.domain.Post;
+import com.vietblog.domain.entity.Post;
 import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDateTime;

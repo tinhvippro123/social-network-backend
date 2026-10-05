@@ -1,6 +1,6 @@
 package com.vietblog.infrastructure.security;
 
-import com.vietblog.domain.User;
+import com.vietblog.domain.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;

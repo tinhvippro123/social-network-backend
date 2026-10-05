@@ -1,6 +1,6 @@
 package com.vietblog.application.dto.auth;
 
-import com.vietblog.domain.User;
+import com.vietblog.domain.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 

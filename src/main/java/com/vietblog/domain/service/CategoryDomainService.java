@@ -1,6 +1,6 @@
 package com.vietblog.domain.service;
 
-import com.vietblog.domain.Category;
+import com.vietblog.domain.entity.Category;
 import com.vietblog.domain.exception.BusinessRuleException;
 import org.springframework.stereotype.Service;
 

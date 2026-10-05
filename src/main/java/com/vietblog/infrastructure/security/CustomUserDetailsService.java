@@ -1,6 +1,6 @@
 package com.vietblog.infrastructure.security;
 
-import com.vietblog.domain.User;
+import com.vietblog.domain.entity.User;
 import com.vietblog.infrastructure.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;

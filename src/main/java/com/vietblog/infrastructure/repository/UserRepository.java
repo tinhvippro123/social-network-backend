@@ -1,6 +1,6 @@
 package com.vietblog.infrastructure.repository;
 
-import com.vietblog.domain.User;
+import com.vietblog.domain.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 

@@ -1,6 +1,6 @@
 package com.vietblog.application.service;
 
-import com.vietblog.domain.User;
+import com.vietblog.domain.entity.User;
 import com.vietblog.application.dto.auth.JwtAuthenticationResponse;
 import com.vietblog.application.dto.auth.LoginRequest;
 import com.vietblog.application.dto.auth.RegisterRequest;
