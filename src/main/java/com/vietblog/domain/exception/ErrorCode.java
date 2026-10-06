@@ -4,30 +4,29 @@ import lombok.Getter;
 
 @Getter
 public enum ErrorCode {
-    // --- Lỗi chung ---
-    INTERNAL_SERVER_ERROR("ERR-001", "Đã xảy ra lỗi hệ thống"),
-    INVALID_INPUT("ERR-002", "Dữ liệu đầu vào không hợp lệ"),
-    
-    // --- Lỗi liên quan đến User ---
-    USER_NOT_FOUND("USR-001", "Người dùng không tồn tại"),
-    USER_ALREADY_EXISTS("USR-002", "Tên đăng nhập đã được sử dụng"),
-    
-    // --- Lỗi liên quan đến Bài viết (Post) ---
-    POST_NOT_FOUND("PST-001", "Bài viết không tồn tại"),
-    POST_TITLE_EMPTY("PST-002", "Tiêu đề bài viết không được để trống"),
-    
-    // --- Lỗi liên quan đến Danh mục (Category) ---
-    CATEGORY_NOT_FOUND("CAT-001", "Danh mục không tồn tại"),
-    CATEGORY_ALREADY_EXISTS("CAT-002", "Tên danh mục đã tồn tại"),
-    
-    // --- Lỗi liên quan đến Bình luận (Comment) ---
-    COMMENT_NOT_FOUND("CMT-001", "Bình luận không tồn tại");
 
-    private final String code;
+    // --- L?i chung ---
+    INTERNAL_SERVER_ERROR("Đã xảy ra lỗi hệ thống"),
+    INVALID_INPUT("Dữ liệu đầu vào không hợp lệ"),
+    
+    // --- L?i li?n quan ??n User ---
+    USER_NOT_FOUND("Người dùng không tồn tại"),
+    USER_ALREADY_EXISTS("Tên đăng nhập đã được sử dụng"),
+    
+    // --- L?i li?n quan ??n B?i vi?t (Post) ---
+    POST_NOT_FOUND("Bài viết không tồn tại"),
+    POST_TITLE_EMPTY("Tiêu đề bài viết không được để trống"),
+    
+    // --- L?i li?n quan ??n Danh m?c (Category) ---
+    CATEGORY_NOT_FOUND("Danh mục không tồn tại"),
+    CATEGORY_ALREADY_EXISTS("Tên danh mục đã tồn tại"),
+    
+    // --- L?i li?n quan ??n B?nh lu?n (Comment) ---
+    COMMENT_NOT_FOUND("Bình luận không tồn tại");
+
     private final String message;
 
-    ErrorCode(String code, String message) {
-        this.code = code;
+    ErrorCode(String message) {
         this.message = message;
     }
 }
