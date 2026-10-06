@@ -5,6 +5,7 @@ import com.vietblog.application.dto.category.CreateCategoryRequest;
 import com.vietblog.domain.entity.Category;
 import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
+import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.service.CategoryDomainService;
 import com.vietblog.infrastructure.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,7 @@ public class CategoryApplicationService {
     public CategoryResponse createCategory(CreateCategoryRequest request) {
         // Kiểm tra xem tên danh mục đã tồn tại chưa
         if (categoryRepository.existsByName(request.getName())) {
-            throw new BusinessRuleException("Tên danh mục đã tồn tại");
+            throw new BusinessRuleException(ErrorCode.CATEGORY_ALREADY_EXISTS);
         }
 
         Category category = Category.builder()
@@ -50,19 +51,19 @@ public class CategoryApplicationService {
     @Transactional(readOnly = true)
     public CategoryResponse getCategoryById(String id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Danh mục", "id", id));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
         return CategoryResponse.fromEntity(category);
     }
 
     @Transactional
     public CategoryResponse updateCategory(String id, CreateCategoryRequest request) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Danh mục", "id", id));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
 
         // Nếu đổi tên, phải check trùng lặp và tạo lại slug
         if (!category.getName().equals(request.getName())) {
             if (categoryRepository.existsByName(request.getName())) {
-                throw new BusinessRuleException("Tên danh mục đã tồn tại");
+                throw new BusinessRuleException(ErrorCode.CATEGORY_ALREADY_EXISTS);
             }
             category.setName(request.getName());
             categoryDomainService.generateSlug(category);
@@ -77,7 +78,7 @@ public class CategoryApplicationService {
     @Transactional
     public void deleteCategory(String id) {
         if (!categoryRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Danh mục", "id", id);
+            throw new ResourceNotFoundException(ErrorCode.CATEGORY_NOT_FOUND);
         }
         // Lưu ý: Thực tế cần kiểm tra xem danh mục có bài viết nào không trước khi xóa.
         // Tạm thời cho phép xóa trực tiếp.

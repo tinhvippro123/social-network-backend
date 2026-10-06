@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 import java.text.Normalizer;
 import java.util.regex.Pattern;
 
+import com.vietblog.domain.exception.ErrorCode;
+
 @Service
 public class CategoryDomainService {
 
@@ -15,7 +17,7 @@ public class CategoryDomainService {
      */
     public void generateSlug(Category category) {
         if (category.getName() == null || category.getName().isEmpty()) {
-            throw new BusinessRuleException("Tên danh mục không được để trống");
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
         }
         
         String temp = Normalizer.normalize(category.getName(), Normalizer.Form.NFD);

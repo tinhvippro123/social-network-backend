@@ -5,6 +5,8 @@ import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.domain.entity.Category;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
+import com.vietblog.domain.exception.ResourceNotFoundException;
+import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.infrastructure.repository.CategoryRepository;
 import com.vietblog.infrastructure.repository.PostRepository;
@@ -35,10 +37,10 @@ public class PostApplicationService {
     @Transactional
     public PostResponse createPost(String authorId, CreatePostRequest request) {
         User author = userRepository.findById(authorId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
         
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new IllegalArgumentException("Category not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
 
         Post post = Post.builder()
                 .title(request.getTitle())
@@ -83,7 +85,7 @@ public class PostApplicationService {
     @Transactional
     public PostResponse getPostById(String id) {
         Post post = postRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Post not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
         
         // Tăng view count
         post.setViewsCount(post.getViewsCount() + 1);
