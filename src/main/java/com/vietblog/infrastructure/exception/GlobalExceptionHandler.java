@@ -24,19 +24,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Object>> handleResourceNotFoundException(ResourceNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(ex.getErrorCode().getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getErrorCode().name(), ex.getMessage()));
     }
 
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ApiResponse<Object>> handleBusinessRuleException(BusinessRuleException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getErrorCode().getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getErrorCode().name(), ex.getMessage()));
     }
 
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiResponse<Object>> handleDomainException(DomainException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getErrorCode().getCode(), ex.getMessage()));
+                .body(ApiResponse.error(ex.getErrorCode().name(), ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -61,6 +61,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGlobalException(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("ERR-001", "Đã xảy ra lỗi hệ thống: " + ex.getMessage()));
+                .body(ApiResponse.error("INTERNAL_SERVER_ERROR", "Đã xảy ra lỗi hệ thống: " + ex.getMessage()));
     }
 }
