@@ -1,4 +1,4 @@
-package com.vietblog.domain;
+package com.vietblog.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -19,6 +19,8 @@ public class Category {
     @Column(nullable = false, unique = true)
     private String slug;
 
+    private String description;
+    
     private String icon;
 
     @Builder.Default

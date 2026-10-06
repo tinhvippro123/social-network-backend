@@ -1,6 +1,6 @@
 package com.vietblog.infrastructure.repository;
 
-import com.vietblog.domain.Reaction;
+import com.vietblog.domain.entity.Reaction;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

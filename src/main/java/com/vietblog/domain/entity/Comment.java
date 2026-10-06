@@ -1,4 +1,4 @@
-package com.vietblog.domain;
+package com.vietblog.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

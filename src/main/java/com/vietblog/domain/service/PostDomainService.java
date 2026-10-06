@@ -1,6 +1,8 @@
 package com.vietblog.domain.service;
 
-import com.vietblog.domain.Post;
+import com.vietblog.domain.entity.Post;
+import com.vietblog.domain.exception.ErrorCode;
+import com.vietblog.domain.exception.BusinessRuleException;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -41,7 +43,7 @@ public class PostDomainService {
      */
     public void validatePostContent(Post post) {
         if (post.getContent().length() < 50) {
-            throw new IllegalArgumentException("Bài viết quá ngắn, tối thiểu phải có 50 ký tự.");
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
         }
         
         // Có thể thêm logic gọi AI kiểm duyệt từ ngữ tục tĩu ở đây sau
