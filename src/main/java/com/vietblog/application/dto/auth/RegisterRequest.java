@@ -7,15 +7,17 @@ import lombok.Data;
 
 @Data
 public class RegisterRequest {
-    @NotBlank
-    @Size(min = 3, max = 50)
+    @NotBlank(message = "Vui lòng nhập họ tên")
     private String name;
 
-    @NotBlank
-    @Email
+    @NotBlank(message = "Vui lòng nhập email")
+    @Email(message = "Email không hợp lệ")
     private String email;
 
-    @NotBlank
-    @Size(min = 6, max = 40)
+    @NotBlank(message = "Vui lòng nhập mật khẩu")
+    @Size(min = 8, message = "Mật khẩu phải có ít nhất 8 ký tự")
     private String password;
+    
+    @NotBlank(message = "Vui lòng xác nhận mật khẩu")
+    private String passwordConfirm;
 }

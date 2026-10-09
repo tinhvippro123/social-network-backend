@@ -39,7 +39,7 @@ public class PostApplicationService {
         User author = userRepository.findById(authorId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
         
-        Category category = categoryRepository.findById(request.getCategoryId())
+        Category category = categoryRepository.findBySlug(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
 
         Post post = Post.builder()
