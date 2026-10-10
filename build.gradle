@@ -35,6 +35,9 @@ dependencies {
 	// ── Database ─────────────────────────────
 	runtimeOnly 'org.postgresql:postgresql'
 
+	// ── Cloudinary ───────────────────────────
+	implementation 'com.cloudinary:cloudinary-http44:1.36.0'
+
 	// ── Lombok ───────────────────────────────
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
