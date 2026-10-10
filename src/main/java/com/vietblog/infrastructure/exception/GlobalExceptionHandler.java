@@ -54,8 +54,18 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
         
-        ApiResponse<Object> response = ApiResponse.error("Dữ liệu đầu vào không hợp lệ");
+        ApiResponse<Object> response = ApiResponse.builder()
+                .success(false)
+                .message("Dữ liệu đầu vào không hợp lệ")
+                .data(errors)
+                .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAuthenticationException(org.springframework.security.core.AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("UNAUTHORIZED", "Email hoặc mật khẩu không chính xác"));
     }
 
     @ExceptionHandler(Exception.class)
