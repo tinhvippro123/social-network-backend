@@ -6,6 +6,7 @@ import com.vietblog.domain.entity.Category;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.BusinessRuleException;
+import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.service.PostDomainService;
@@ -107,5 +108,57 @@ public class PostApplicationService {
         postRepository.save(post);
         
         return PostResponse.fromEntity(post);
+    }
+
+    @Transactional
+    public PostResponse updatePost(String id, String userId, CreatePostRequest request) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
+
+        // Kiểm tra quyền sở hữu: Chỉ tác giả mới được cập nhật bài viết
+        if (!post.getAuthor().getId().equals(userId)) {
+            throw new ForbiddenException(ErrorCode.FORBIDDEN);
+        }
+
+        Category category = categoryRepository.findBySlug(request.getCategoryId())
+                .or(() -> categoryRepository.findById(request.getCategoryId()))
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        Post.PostStatus status = post.getStatus();
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            try {
+                status = Post.PostStatus.valueOf(request.getStatus().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+            }
+        }
+
+        post.setTitle(request.getTitle());
+        post.setContent(request.getContent());
+        post.setExcerpt(request.getExcerpt());
+        post.setCoverImage(request.getCoverImage());
+        post.setCategory(category);
+        post.setTags(request.getTags());
+        post.setStatus(status);
+        post.setLatitude(request.getLatitude());
+        post.setLongitude(request.getLongitude());
+
+        postDomainService.validatePostContent(post);
+
+        Post updatedPost = postRepository.save(post);
+        return PostResponse.fromEntity(updatedPost);
+    }
+
+    @Transactional
+    public void deletePost(String id, String userId) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
+
+        // Kiểm tra quyền sở hữu: Chỉ tác giả mới được xóa bài viết
+        if (!post.getAuthor().getId().equals(userId)) {
+            throw new ForbiddenException(ErrorCode.FORBIDDEN);
+        }
+
+        postRepository.delete(post);
     }
 }

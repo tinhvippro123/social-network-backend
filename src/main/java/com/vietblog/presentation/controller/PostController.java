@@ -55,4 +55,21 @@ public class PostController {
         PostResponse response = postApplicationService.getPostById(id);
         return ResponseEntity.ok(ApiResponse.success(response, "Lấy bài viết thành công"));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<PostResponse>> updatePost(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody CreatePostRequest request) {
+        PostResponse response = postApplicationService.updatePost(id, currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật bài viết thành công"));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deletePost(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        postApplicationService.deletePost(id, currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa bài viết thành công"));
+    }
 }
