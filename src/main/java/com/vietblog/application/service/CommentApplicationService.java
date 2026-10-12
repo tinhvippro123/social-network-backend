@@ -44,7 +44,7 @@ public class CommentApplicationService {
             
             // Đảm bảo comment cha thuộc cùng một bài viết
             if (!parentComment.getPost().getId().equals(postId)) {
-                throw new IllegalArgumentException("Parent comment does not belong to this post");
+                throw new IllegalArgumentException("Bình luận cha không thuộc bài viết này");
             }
             
             commentDomainService.validateNestingLevel(parentComment);
