@@ -16,6 +16,7 @@ public enum ErrorCode {
     USER_ALREADY_EXISTS("Tên đăng nhập đã được sử dụng"),
     EMAIL_ALREADY_EXISTS("Email này đã được sử dụng"),
     CURRENT_PASSWORD_INCORRECT("Mật khẩu hiện tại không chính xác"),
+    CANNOT_FOLLOW_SELF("Bạn không thể tự theo dõi chính mình"),
     
     // --- Lỗi liên quan đến Bài viết (Post) ---
     POST_NOT_FOUND("Bài viết không tồn tại"),

@@ -16,6 +16,30 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.vietblog.application.service.UserApplicationService userApplicationService;
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<com.vietblog.application.dto.user.UserProfileResponse>> getMyProfile(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.vietblog.infrastructure.security.UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("UNAUTHORIZED", "Vui lòng đăng nhập"));
+        }
+        com.vietblog.application.dto.user.UserProfileResponse response = userApplicationService.getCurrentUserProfile(currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thông tin cá nhân thành công"));
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<ApiResponse<com.vietblog.application.dto.user.UserProfileResponse>> updateMyProfile(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.vietblog.infrastructure.security.UserPrincipal currentUser,
+            @Valid @RequestBody com.vietblog.application.dto.user.UpdateProfileRequest request) {
+        if (currentUser == null) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("UNAUTHORIZED", "Vui lòng đăng nhập"));
+        }
+        com.vietblog.application.dto.user.UserProfileResponse response = userApplicationService.updateProfile(currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật hồ sơ thành công"));
+    }
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<JwtAuthenticationResponse>> login(@Valid @RequestBody LoginRequest request) {
