@@ -4,6 +4,8 @@ import com.vietblog.domain.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 @AllArgsConstructor
 public class JwtAuthenticationResponse {
@@ -19,7 +21,7 @@ public class JwtAuthenticationResponse {
         private String avatar;
         private String role;
         private String bio;
-        private java.time.LocalDateTime joinedAt;
+        private LocalDateTime joinedAt;
         private int postsCount;
         private int followersCount;
         private int followingCount;
