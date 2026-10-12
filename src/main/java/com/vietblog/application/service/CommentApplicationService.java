@@ -5,6 +5,7 @@ import com.vietblog.application.dto.comment.CreateCommentRequest;
 import com.vietblog.domain.entity.Comment;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
+import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.domain.service.CommentDomainService;
@@ -44,7 +45,7 @@ public class CommentApplicationService {
             
             // Đảm bảo comment cha thuộc cùng một bài viết
             if (!parentComment.getPost().getId().equals(postId)) {
-                throw new IllegalArgumentException("Bình luận cha không thuộc bài viết này");
+                throw new BusinessRuleException(ErrorCode.PARENT_COMMENT_NOT_IN_POST);
             }
             
             commentDomainService.validateNestingLevel(parentComment);

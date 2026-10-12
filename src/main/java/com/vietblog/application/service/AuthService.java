@@ -1,6 +1,9 @@
 package com.vietblog.application.service;
 
 import com.vietblog.domain.entity.User;
+import com.vietblog.domain.exception.BusinessRuleException;
+import com.vietblog.domain.exception.ErrorCode;
+import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.application.dto.auth.JwtAuthenticationResponse;
 import com.vietblog.application.dto.auth.LoginRequest;
 import com.vietblog.application.dto.auth.RegisterRequest;
@@ -33,7 +36,8 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = tokenProvider.generateToken(authentication);
 
-        User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
@@ -42,7 +46,7 @@ public class AuthService {
 
     public void register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email này đã được sử dụng");
+            throw new BusinessRuleException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
         User user = User.builder()
@@ -56,10 +60,10 @@ public class AuthService {
 
     public void changePassword(String email, String currentPassword, String newPassword) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
-            throw new IllegalArgumentException("Mật khẩu hiện tại không chính xác");
+            throw new BusinessRuleException(ErrorCode.CURRENT_PASSWORD_INCORRECT);
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));

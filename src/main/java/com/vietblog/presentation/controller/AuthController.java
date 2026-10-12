@@ -35,15 +35,10 @@ public class AuthController {
         
         if (principal == null) {
             return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Vui lòng đăng nhập để thực hiện", "UNAUTHORIZED"));
+                .body(ApiResponse.error("UNAUTHORIZED", "Vui lòng đăng nhập để thực hiện"));
         }
 
-        try {
-            authService.changePassword(principal.getName(), request.getCurrentPassword(), request.getNewPassword());
-            return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công"));
-        } catch (IllegalArgumentException e) {
-            return org.springframework.http.ResponseEntity.badRequest()
-                .body(ApiResponse.error(e.getMessage(), "BAD_REQUEST"));
-        }
+        authService.changePassword(principal.getName(), request.getCurrentPassword(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công"));
     }
 }
