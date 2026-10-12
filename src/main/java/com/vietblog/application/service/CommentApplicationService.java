@@ -7,6 +7,7 @@ import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ErrorCode;
+import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.domain.service.CommentDomainService;
 import com.vietblog.infrastructure.repository.CommentRepository;
@@ -80,9 +81,9 @@ public class CommentApplicationService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.COMMENT_NOT_FOUND));
 
-        // Kiểm tra quyền: Chỉ tác giả comment hoặc người có quyền Admin mới được xóa
+        // Kiểm tra quyền: Chỉ tác giả comment mới được xóa
         if (!comment.getAuthor().getId().equals(userId)) {
-            throw new RuntimeException("Bạn không có quyền xóa bình luận này"); // Tạm throw RuntimeException
+            throw new ForbiddenException(ErrorCode.COMMENT_DELETE_FORBIDDEN);
         }
 
         commentRepository.delete(comment);

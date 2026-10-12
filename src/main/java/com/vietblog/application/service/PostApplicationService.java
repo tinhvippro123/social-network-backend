@@ -5,6 +5,7 @@ import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.domain.entity.Category;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
+import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.service.PostDomainService;
@@ -40,7 +41,17 @@ public class PostApplicationService {
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
         
         Category category = categoryRepository.findBySlug(request.getCategoryId())
+                .or(() -> categoryRepository.findById(request.getCategoryId()))
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        Post.PostStatus status = Post.PostStatus.PUBLISHED;
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            try {
+                status = Post.PostStatus.valueOf(request.getStatus().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+            }
+        }
 
         Post post = Post.builder()
                 .title(request.getTitle())
@@ -50,7 +61,7 @@ public class PostApplicationService {
                 .author(author)
                 .category(category)
                 .tags(request.getTags())
-                .status(Post.PostStatus.valueOf(request.getStatus().toUpperCase()))
+                .status(status)
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .build();

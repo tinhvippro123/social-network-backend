@@ -16,8 +16,8 @@ public class CategoryDomainService {
      * Tạo Slug từ tên danh mục. Ví dụ: "Lập trình Java" -> "lap-trinh-java"
      */
     public void generateSlug(Category category) {
-        if (category.getName() == null || category.getName().isEmpty()) {
-            throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        if (category.getName() == null || category.getName().trim().isEmpty()) {
+            throw new BusinessRuleException(ErrorCode.CATEGORY_NAME_EMPTY);
         }
         
         String temp = Normalizer.normalize(category.getName(), Normalizer.Form.NFD);

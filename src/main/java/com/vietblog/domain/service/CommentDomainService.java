@@ -13,10 +13,10 @@ public class CommentDomainService {
      */
     public void validateCommentContent(String content) {
         if (content == null || content.trim().isEmpty()) {
-            throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+            throw new BusinessRuleException(ErrorCode.COMMENT_CONTENT_EMPTY);
         }
         if (content.length() > 2000) {
-            throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+            throw new BusinessRuleException(ErrorCode.COMMENT_TOO_LONG);
         }
     }
 
@@ -36,7 +36,7 @@ public class CommentDomainService {
         // Nếu đã lồng quá 2 cấp (1 parent -> 1 child -> 1 sub-child), cấm reply tiếp 
         // hoặc bắt buộc gán nó vào sub-child. (Tuỳ logic FE). Tạm thời cho tối đa 3 cấp.
         if (depth >= 3) {
-            throw new BusinessRuleException(ErrorCode.INVALID_INPUT); // Cấp độ quá sâu
+            throw new BusinessRuleException(ErrorCode.COMMENT_MAX_DEPTH_EXCEEDED);
         }
     }
 }

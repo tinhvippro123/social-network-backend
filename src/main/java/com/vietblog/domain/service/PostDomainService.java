@@ -42,8 +42,8 @@ public class PostDomainService {
      * Validate nghiệp vụ khi đăng bài (Ví dụ: Chống spam từ ngữ, kiểm tra độ dài)
      */
     public void validatePostContent(Post post) {
-        if (post.getContent().length() < 50) {
-            throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        if (post.getContent() == null || post.getContent().trim().length() < 50) {
+            throw new BusinessRuleException(ErrorCode.POST_CONTENT_TOO_SHORT);
         }
         
         // Có thể thêm logic gọi AI kiểm duyệt từ ngữ tục tĩu ở đây sau
