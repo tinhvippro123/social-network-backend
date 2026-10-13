@@ -41,6 +41,9 @@ dependencies {
 	// ── PDFBox (Document search extraction) ──
 	implementation 'org.apache.pdfbox:pdfbox:3.0.8'
 
+	// ── Jsoup (HTML Sanitization for rich text) ──
+	implementation 'org.jsoup:jsoup:1.18.3'
+
 	// ── Lombok ───────────────────────────────
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'

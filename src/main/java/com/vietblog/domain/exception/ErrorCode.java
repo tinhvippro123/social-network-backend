@@ -54,7 +54,10 @@ public enum ErrorCode {
     MESSAGE_NOT_FOUND("Tin nhắn không tồn tại"),
 
     // --- Lỗi liên quan đến Thông báo (Notification) ---
-    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại");
+    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại"),
+
+    // --- Lỗi liên quan đến Giới hạn tốc độ (Rate Limit) ---
+    RATE_LIMIT_EXCEEDED("Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.");
 
     private final String message;
 

@@ -7,7 +7,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "posts")
+@Table(name = "posts", indexes = {
+    @Index(name = "idx_posts_status_created", columnList = "status, createdAt DESC"),
+    @Index(name = "idx_posts_author_status", columnList = "author_id, status"),
+    @Index(name = "idx_posts_category_status", columnList = "category_id, status")
+})
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Post {
 

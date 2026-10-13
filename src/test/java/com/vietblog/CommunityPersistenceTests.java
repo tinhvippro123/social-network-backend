@@ -7,6 +7,7 @@ import com.vietblog.application.service.GroupService;
 import com.vietblog.domain.entity.*;
 import com.vietblog.domain.exception.*;
 import com.vietblog.infrastructure.repository.*;
+import com.vietblog.infrastructure.security.HtmlSanitizer;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -22,7 +23,7 @@ import static org.assertj.core.api.Assertions.*;
     "spring.datasource.driver-class-name=org.h2.Driver"
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({GroupService.class, ChatService.class})
+@Import({GroupService.class, ChatService.class, HtmlSanitizer.class})
 class CommunityPersistenceTests {
     @Autowired GroupService groups;
     @Autowired ChatService chat;

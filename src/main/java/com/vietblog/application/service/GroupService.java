@@ -4,6 +4,7 @@ import com.vietblog.application.dto.community.CommunityDtos.*;
 import com.vietblog.domain.entity.*;
 import com.vietblog.domain.exception.*;
 import com.vietblog.infrastructure.repository.*;
+import com.vietblog.infrastructure.security.HtmlSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ public class GroupService {
     private final GroupMemberRepository members;
     private final GroupPostRepository posts;
     private final UserRepository users;
+    private final HtmlSanitizer htmlSanitizer;
 
     @Transactional(readOnly = true)
     public Page<GroupResponse> list(String userId, boolean joined, String query, int page, int limit) {
@@ -112,7 +114,7 @@ public class GroupService {
         Group group = lock(id);
         GroupMember author = member(id, userId);
         GroupPost post = GroupPost.builder().group(group).author(author.getUser()).title(request.title().trim())
-                .content(request.content()).excerpt(request.excerpt()).coverImage(request.coverImage()).build();
+                .content(htmlSanitizer.sanitize(request.content())).excerpt(request.excerpt()).coverImage(request.coverImage()).build();
         return GroupPostResponse.from(posts.save(post));
     }
 
@@ -122,7 +124,7 @@ public class GroupService {
         GroupPost post = findPost(id, postId);
         if (!post.getAuthor().getId().equals(userId)) forbidden();
         post.setTitle(request.title().trim());
-        post.setContent(request.content());
+        post.setContent(htmlSanitizer.sanitize(request.content()));
         post.setExcerpt(request.excerpt());
         post.setCoverImage(request.coverImage());
         post.setUpdatedAt(LocalDateTime.now());
