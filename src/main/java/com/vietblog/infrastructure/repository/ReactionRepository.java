@@ -1,6 +1,7 @@
 package com.vietblog.infrastructure.repository;
 
-import com.vietblog.domain.Reaction;
+import org.springframework.data.jpa.repository.Modifying;
+import com.vietblog.domain.entity.Reaction;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -8,6 +9,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ReactionRepository extends JpaRepository<Reaction, String> {
+    @Modifying
+    @Query("delete from Reaction r where r.post.id = :postId")
+    void deleteForPost(@Param("postId") String postId);
     Optional<Reaction> findByUserIdAndPostId(String userId, String postId);
     List<Reaction> findByPostId(String postId);
     void deleteByUserIdAndPostId(String userId, String postId);

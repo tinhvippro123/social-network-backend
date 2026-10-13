@@ -1,6 +1,6 @@
 package com.vietblog.application.dto.post;
 
-import com.vietblog.domain.Post;
+import com.vietblog.domain.entity.Post;
 import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -14,16 +14,35 @@ public class PostResponse {
     private String excerpt;
     private String content;
     private String coverImage;
-    private String authorId;
-    private String authorName;
-    private String authorAvatar;
-    private String categoryId;
-    private String categoryName;
+    private AuthorDto author;
+    private CategoryDto category;
     private List<String> tags;
     private int viewsCount;
     private int upvotesCount;
+    private int downvotesCount;
+    private Double latitude;
+    private Double longitude;
+    private String locationAddress;
+    private Post.PostStatus status;
     private int commentsCount;
     private LocalDateTime createdAt;
+    
+    @Data
+    @Builder
+    public static class AuthorDto {
+        private String id;
+        private String name;
+        private String avatar;
+    }
+    
+    @Data
+    @Builder
+    public static class CategoryDto {
+        private String id;
+        private String name;
+        private String slug;
+        private String icon;
+    }
 
     public static PostResponse fromEntity(Post post) {
         return PostResponse.builder()
@@ -32,14 +51,25 @@ public class PostResponse {
                 .excerpt(post.getExcerpt())
                 .content(post.getContent())
                 .coverImage(post.getCoverImage())
-                .authorId(post.getAuthor().getId())
-                .authorName(post.getAuthor().getName())
-                .authorAvatar(post.getAuthor().getAvatar())
-                .categoryId(post.getCategory().getId())
-                .categoryName(post.getCategory().getName())
+                .author(AuthorDto.builder()
+                        .id(post.getAuthor().getId())
+                        .name(post.getAuthor().getName())
+                        .avatar(post.getAuthor().getAvatar())
+                        .build())
+                .category(CategoryDto.builder()
+                        .id(post.getCategory().getId())
+                        .name(post.getCategory().getName())
+                        .slug(post.getCategory().getSlug())
+                        .icon(post.getCategory().getIcon())
+                        .build())
                 .tags(post.getTags())
                 .viewsCount(post.getViewsCount())
                 .upvotesCount(post.getUpvotesCount())
+                .downvotesCount(post.getDownvotesCount())
+                .latitude(post.getLatitude())
+                .longitude(post.getLongitude())
+                .locationAddress(post.getLocationAddress())
+                .status(post.getStatus())
                 .commentsCount(post.getCommentsCount())
                 .createdAt(post.getCreatedAt())
                 .build();

@@ -6,7 +6,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/vietblog
     username: postgres
-    password: postgres
+    password: 123456
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -43,3 +43,9 @@ jwt:
 # ── CORS ──────────────────────────────────
 cors:
   allowed-origins: http://localhost:5173,http://localhost:3000
+
+# ── Cloudinary ────────────────────────────
+cloudinary:
+  cloud-name: dan2b8knu
+  api-key: YOUR_API_KEY_HERE
+  api-secret: YOUR_API_SECRET_HERE

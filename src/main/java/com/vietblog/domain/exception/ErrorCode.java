@@ -1,0 +1,67 @@
+package com.vietblog.domain.exception;
+
+import lombok.Getter;
+
+@Getter
+public enum ErrorCode {
+
+    // --- Lỗi chung ---
+    INTERNAL_SERVER_ERROR("Đã xảy ra lỗi hệ thống"),
+    INVALID_INPUT("Dữ liệu đầu vào không hợp lệ"),
+    UNAUTHORIZED("Vui lòng đăng nhập để tiếp tục"),
+    FORBIDDEN("Bạn không có quyền thực hiện hành động này"),
+    
+    // --- Lỗi liên quan đến User ---
+    USER_NOT_FOUND("Người dùng không tồn tại"),
+    USER_ALREADY_EXISTS("Tên đăng nhập đã được sử dụng"),
+    EMAIL_ALREADY_EXISTS("Email này đã được sử dụng"),
+    CURRENT_PASSWORD_INCORRECT("Mật khẩu hiện tại không chính xác"),
+    CANNOT_FOLLOW_SELF("Bạn không thể tự theo dõi chính mình"),
+    
+    // --- Lỗi liên quan đến Bài viết (Post) ---
+    POST_NOT_FOUND("Bài viết không tồn tại"),
+    POST_TITLE_EMPTY("Tiêu đề bài viết không được để trống"),
+    POST_CONTENT_TOO_SHORT("Nội dung bài viết phải có ít nhất 50 ký tự"),
+    
+    // --- Lỗi liên quan đến Danh mục (Category) ---
+    CATEGORY_NOT_FOUND("Danh mục không tồn tại"),
+    CATEGORY_ALREADY_EXISTS("Tên danh mục đã tồn tại"),
+    CATEGORY_NAME_EMPTY("Tên danh mục không được để trống"),
+    
+    // --- Lỗi liên quan đến Bình luận (Comment) ---
+    COMMENT_NOT_FOUND("Bình luận không tồn tại"),
+    PARENT_COMMENT_NOT_IN_POST("Bình luận cha không thuộc bài viết này"),
+    COMMENT_CONTENT_EMPTY("Nội dung bình luận không được để trống"),
+    COMMENT_TOO_LONG("Nội dung bình luận không được vượt quá 2000 ký tự"),
+    COMMENT_MAX_DEPTH_EXCEEDED("Không thể phản hồi bình luận vượt quá cấp độ cho phép"),
+    COMMENT_DELETE_FORBIDDEN("Bạn không có quyền xóa bình luận này"),
+
+    // --- Lỗi liên quan đến Tệp tin (File) ---
+    FILE_EMPTY("Tệp tin tải lên không được để trống"),
+    FILE_UPLOAD_FAILED("Tải tệp tin lên hệ thống thất bại"),
+
+    // --- Lỗi liên quan đến Quản trị & Báo cáo (Admin & Report) ---
+    PROTECTED_ADMIN_ACCOUNT("Tài khoản quản trị viên được bảo vệ, không thể thực hiện thao tác này"),
+    REPORT_NOT_FOUND("Báo cáo không tồn tại"),
+    REPORT_ALREADY_PENDING("Bạn đã có báo cáo đang chờ xử lý cho đối tượng này"),
+    REPORT_ALREADY_RESOLVED("Báo cáo này đã được xử lý trước đó"),
+
+    // --- Lỗi liên quan đến Nhóm (Group) ---
+    GROUP_NOT_FOUND("Nhóm không tồn tại"),
+
+    // --- Lỗi liên quan đến Tin nhắn & Cuộc trò chuyện (Chat) ---
+    CONVERSATION_NOT_FOUND("Cuộc trò chuyện không tồn tại"),
+    MESSAGE_NOT_FOUND("Tin nhắn không tồn tại"),
+
+    // --- Lỗi liên quan đến Thông báo (Notification) ---
+    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại"),
+
+    // --- Lỗi liên quan đến Giới hạn tốc độ (Rate Limit) ---
+    RATE_LIMIT_EXCEEDED("Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.");
+
+    private final String message;
+
+    ErrorCode(String message) {
+        this.message = message;
+    }
+}

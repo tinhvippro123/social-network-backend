@@ -15,6 +15,8 @@ public class ApiResponse<T> {
     private T data;
     private Meta meta;
 
+    private String errorCode; // Thêm field errorCode
+
     public static <T> ApiResponse<T> success(T data, String message) {
         return ApiResponse.<T>builder()
                 .success(true)
@@ -26,6 +28,15 @@ public class ApiResponse<T> {
     public static <T> ApiResponse<T> error(String message) {
         return ApiResponse.<T>builder()
                 .success(false)
+                .message(message)
+                .build();
+    }
+
+    // Overload method nhận thêm errorCode
+    public static <T> ApiResponse<T> error(String code, String message) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .errorCode(code)
                 .message(message)
                 .build();
     }
