@@ -39,6 +39,13 @@ public class Report {
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    private String resolutionAction;
+    private LocalDateTime resolvedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resolved_by_id")
+    private User resolvedBy;
+
     public enum TargetType {
         POST, COMMENT, USER, GROUP
     }

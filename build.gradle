@@ -38,6 +38,9 @@ dependencies {
 	// ── Cloudinary ───────────────────────────
 	implementation 'com.cloudinary:cloudinary-http44:1.36.0'
 
+	// ── PDFBox (Document search extraction) ──
+	implementation 'org.apache.pdfbox:pdfbox:3.0.3'
+
 	// ── Lombok ───────────────────────────────
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -48,6 +51,7 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testRuntimeOnly 'com.h2database:h2'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
