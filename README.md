@@ -1,5 +1,7 @@
 # VietBlog Backend API
 
+Implementation and endpoint coverage: [proposal API coverage](docs/proposal-api-coverage.md), [search and analysis](docs/search-api.md), [groups and chat](docs/community-api.md), [administration](docs/admin-api.md).
+
 > Nền tảng chia sẻ bài viết cộng đồng công nghệ Việt Nam. Hệ thống Backend được xây dựng theo kiến trúc **Clean Architecture** (Pragmatic approach) kết hợp **Domain-Driven Design (DDD lite)**.
 
 ## 🚀 Công nghệ sử dụng

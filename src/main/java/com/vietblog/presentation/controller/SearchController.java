@@ -1,5 +1,6 @@
 package com.vietblog.presentation.controller;
 
+import java.util.Map;
 import com.vietblog.application.dto.ApiResponse;
 import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.application.dto.search.*;
@@ -20,6 +21,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SearchController {
     private final SearchApplicationService search;
+
+    @GetMapping("/moderation/sentiment")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    public ApiResponse<Map<String, Long>> sentimentStats() {
+        return ApiResponse.success(search.sentimentStats(), "Comment sentiment counts");
+    }
 
     @GetMapping("/search")
     public ApiResponse<List<PostResponse>> search(@RequestParam String q, @RequestParam(defaultValue = "keyword") String type,

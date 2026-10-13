@@ -6,7 +6,6 @@ import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
 import java.util.Collection;
 import java.util.Collections;
 
@@ -18,6 +17,11 @@ public class UserPrincipal implements UserDetails {
     private final String email;
     private final String password;
     private final Collection<? extends GrantedAuthority> authorities;
+    private final boolean enabled;
+
+    public UserPrincipal(String id, String email, String password, Collection<? extends GrantedAuthority> authorities) {
+        this(id, email, password, authorities, true);
+    }
 
     public static UserPrincipal create(User user) {
         GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name());
@@ -25,7 +29,8 @@ public class UserPrincipal implements UserDetails {
             user.getId(),
             user.getEmail(),
             user.getPassword(),
-            Collections.singletonList(authority)
+            Collections.singletonList(authority),
+            user.isActive()
         );
     }
 
@@ -61,6 +66,6 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return enabled;
     }
 }

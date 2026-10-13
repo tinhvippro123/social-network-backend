@@ -1,5 +1,6 @@
 package com.vietblog.application.service;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.application.dto.search.SummaryResponse;
 import com.vietblog.domain.entity.Post;
@@ -13,7 +14,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.util.*;
 import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
@@ -29,6 +29,15 @@ public class SearchApplicationService {
     private final PostImageFeaturesRepository imageIndex;
     private final SearchCommentRepository comments;
     private final SearchFileReader files;
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    public Map<String, Long> sentimentStats() {
+        Map<String, Long> counts = new LinkedHashMap<>(Map.of("positive", 0L, "negative", 0L, "neutral", 0L));
+        try (var texts = comments.streamContents()) {
+            texts.forEach(text -> counts.merge(TextAlgorithms.sentiment(text).label(), 1L, Long::sum));
+        }
+        return counts;
+    }
 
     private List<Post> corpus() {
         return posts.findByStatusOrderByCreatedAtDescIdAsc(Post.PostStatus.PUBLISHED, PageRequest.of(0, MAX_CORPUS));

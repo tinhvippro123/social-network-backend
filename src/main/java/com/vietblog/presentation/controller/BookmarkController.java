@@ -1,5 +1,6 @@
 package com.vietblog.presentation.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.vietblog.application.dto.ApiResponse;
 import com.vietblog.application.service.BookmarkService;
 import com.vietblog.infrastructure.security.UserPrincipal;
@@ -26,6 +27,7 @@ public class BookmarkController {
     }
 
     @GetMapping("/check")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Boolean>> checkBookmark(
             @PathVariable String postId,
             @AuthenticationPrincipal UserPrincipal currentUser) {

@@ -1,5 +1,9 @@
 package com.vietblog.application.service;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
+import com.vietblog.application.dto.post.PostResponse;
+import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.entity.Bookmark;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
@@ -22,7 +26,8 @@ public class BookmarkService {
 
     @Transactional
     public boolean toggleBookmark(String postId, String userId) {
-        Post post = postRepository.findById(postId)
+        Post post = postRepository.findLockedById(postId)
+                .filter(item -> item.getStatus() == Post.PostStatus.PUBLISHED)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
 
         User user = userRepository.findById(userId)
@@ -46,5 +51,13 @@ public class BookmarkService {
     @Transactional(readOnly = true)
     public boolean checkIsBookmarked(String postId, String userId) {
         return bookmarkRepository.existsByUserIdAndPostId(userId, postId);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PostResponse> list(String userId, int page, int limit) {
+        if (page < 1 || limit < 1 || limit > 100) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        return bookmarkRepository.findByUserIdAndPostStatusOrderByCreatedAtDesc(userId, Post.PostStatus.PUBLISHED,
+                PageRequest.of(page - 1, limit))
+                .map(bookmark -> PostResponse.fromEntity(bookmark.getPost()));
     }
 }

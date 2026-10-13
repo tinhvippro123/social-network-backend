@@ -41,4 +41,12 @@ Notification creation is internal through `NotificationService.notify`; there is
 
 ## Validation
 
+Additional administration endpoints:
+
+- `PATCH /api/admin/tags/{name}` with `{"name":"replacement"}` renames assignments across posts and removes duplicates. `DELETE /api/admin/tags/{name}` removes assignments. Both require `ADMIN` and return the affected post count.
+- `PATCH /api/moderation/posts/{id}/status` accepts `PUBLISHED` or `HIDDEN` for `ADMIN`/`MODERATOR`, excluding author-private drafts.
+- `GET /api/moderation/sentiment` returns positive/negative/neutral counts for all comments using the current lexicon analyzer; see [search limitations](search-api.md).
+
+Comment creation also creates a notification for the post author when someone else comments. Account banning now blocks previously issued JWTs as well as new logins.
+
 Service tests cover administrator protection, role authorization, pagination limits, duplicate report rejection, private/hidden target access, moderation effects and recipient ownership. Repository tests verify persisted filtering and notification ownership against an isolated test database. No production services or seeded accounts are required.
