@@ -1,5 +1,9 @@
 package com.vietblog.application.dto.post;
 
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -20,12 +24,21 @@ public class CreatePostRequest {
     @NotNull(message = "Danh mục không được để trống")
     private String categoryId;
 
-    private List<String> tags;
+    @Size(max = 20)
+    private List<@NotBlank @Size(max = 64) String> tags;
     private String coverImage;
     
     // Draft or Published
+    @Pattern(regexp = "(?i)DRAFT|PUBLISHED")
     private String status;
 
+    @DecimalMin("-90")
+    @DecimalMax("90")
     private Double latitude;
+    @DecimalMin("-180")
+    @DecimalMax("180")
     private Double longitude;
+
+    @AssertTrue(message = "Latitude and longitude must be provided together")
+    public boolean isLocationComplete() { return (latitude == null) == (longitude == null); }
 }
