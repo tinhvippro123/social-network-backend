@@ -7,6 +7,7 @@ import com.vietblog.infrastructure.repository.PostImageFeaturesRepository;
 import com.vietblog.infrastructure.repository.BookmarkRepository;
 import com.vietblog.infrastructure.repository.ReactionRepository;
 import com.vietblog.infrastructure.repository.CommentRepository;
+import com.vietblog.infrastructure.security.HtmlSanitizer;
 import com.vietblog.application.dto.post.CreatePostRequest;
 import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.domain.entity.Category;
@@ -45,6 +46,7 @@ public class PostApplicationService {
     private final ReactionRepository reactions;
     private final BookmarkRepository bookmarks;
     private final PostImageFeaturesRepository imageFeatures;
+    private final HtmlSanitizer htmlSanitizer;
 
     @Transactional
     public PostResponse createPost(String authorId, CreatePostRequest request) {
@@ -66,7 +68,7 @@ public class PostApplicationService {
 
         Post post = Post.builder()
                 .title(request.getTitle())
-                .content(request.getContent())
+                .content(htmlSanitizer.sanitize(request.getContent()))
                 .excerpt(request.getExcerpt())
                 .coverImage(request.getCoverImage())
                 .author(author)
@@ -157,7 +159,7 @@ public class PostApplicationService {
         }
 
         post.setTitle(request.getTitle());
-        post.setContent(request.getContent());
+        post.setContent(htmlSanitizer.sanitize(request.getContent()));
         post.setExcerpt(request.getExcerpt());
         post.setCoverImage(request.getCoverImage());
         post.setCategory(category);

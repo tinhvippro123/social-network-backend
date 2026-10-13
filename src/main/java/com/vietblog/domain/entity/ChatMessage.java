@@ -5,7 +5,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
-@Entity @Table(name = "chat_messages", indexes = @Index(columnList = "conversation_id,createdAt"))
+@Entity @Table(name = "chat_messages", indexes = {
+    @Index(name = "idx_chat_messages_conv_created", columnList = "conversation_id, createdAt DESC"),
+    @Index(name = "idx_chat_messages_sender", columnList = "sender_id")
+})
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ChatMessage {
     @Id @GeneratedValue(strategy = GenerationType.UUID)

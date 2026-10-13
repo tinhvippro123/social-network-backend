@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-@Entity @Table(name = "conversation_members", uniqueConstraints = @UniqueConstraint(columnNames = {"conversation_id", "user_id"}))
+@Entity @Table(name = "conversation_members",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"conversation_id", "user_id"}),
+        indexes = @Index(name = "idx_conv_member_user_hidden", columnList = "user_id, hidden"))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ConversationMember {
     @Id @GeneratedValue(strategy = GenerationType.UUID)

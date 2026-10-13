@@ -39,6 +39,9 @@ dependencies {
 	// ── Cloudinary ───────────────────────────
 	implementation 'com.cloudinary:cloudinary-http44:1.36.0'
 
+	// ── Jsoup (HTML Sanitization for rich text) ──
+	implementation 'org.jsoup:jsoup:1.18.3'
+
 	// ── Lombok ───────────────────────────────
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'

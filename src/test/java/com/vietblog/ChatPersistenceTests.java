@@ -1,9 +1,7 @@
 package com.vietblog;
 
 import com.vietblog.application.dto.chat.ChatDtos.*;
-import com.vietblog.application.dto.community.CommunityDtos.*;
 import com.vietblog.application.service.ChatService;
-import com.vietblog.application.service.GroupService;
 import com.vietblog.domain.entity.*;
 import com.vietblog.domain.exception.*;
 import com.vietblog.infrastructure.repository.*;
@@ -24,6 +22,7 @@ import static org.assertj.core.api.Assertions.*;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(ChatService.class)
 class ChatPersistenceTests {
+
     @Autowired ChatService chat;
     @Autowired UserRepository users;
     @Autowired ChatMessageRepository messages;
