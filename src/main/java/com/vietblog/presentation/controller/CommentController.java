@@ -11,7 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
@@ -44,7 +43,7 @@ public class CommentController {
             @PathVariable String commentId,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         
-        commentApplicationService.deleteComment(commentId, currentUser.getId());
+        commentApplicationService.deleteComment(postId, commentId, currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa bình luận thành công"));
     }
 }

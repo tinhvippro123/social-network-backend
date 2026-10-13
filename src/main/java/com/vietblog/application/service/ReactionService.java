@@ -1,5 +1,6 @@
 package com.vietblog.application.service;
 
+import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.Reaction;
 import com.vietblog.domain.entity.User;
@@ -12,7 +13,6 @@ import com.vietblog.infrastructure.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,10 +25,13 @@ public class ReactionService {
     private final ReactionRepository reactionRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final PostDomainService postDomainService;
 
     @Transactional
     public void toggleReaction(String postId, String userId, String emoji) {
-        Post post = postRepository.findById(postId)
+        if (emoji == null || emoji.isBlank() || emoji.length() > 32) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        Post post = postRepository.findLockedById(postId)
+                .filter(item -> item.getStatus() == Post.PostStatus.PUBLISHED)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
 
         User user = userRepository.findById(userId)
@@ -69,11 +72,14 @@ public class ReactionService {
             if (emoji.equals("DOWNVOTE")) post.setDownvotesCount(post.getDownvotesCount() + 1);
         }
         
+        postDomainService.calculateTrendingScore(post);
         postRepository.save(post);
     }
 
     @Transactional(readOnly = true)
     public Map<String, Long> getReactionSummary(String postId) {
+        postRepository.findById(postId).filter(post -> post.getStatus() == Post.PostStatus.PUBLISHED)
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
         List<Object[]> results = reactionRepository.countByPostIdGroupByEmoji(postId);
         Map<String, Long> summary = new HashMap<>();
         for (Object[] result : results) {
