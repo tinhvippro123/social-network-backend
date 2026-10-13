@@ -19,6 +19,11 @@ public class PostResponse {
     private List<String> tags;
     private int viewsCount;
     private int upvotesCount;
+    private int downvotesCount;
+    private Double latitude;
+    private Double longitude;
+    private String locationAddress;
+    private Post.PostStatus status;
     private int commentsCount;
     private LocalDateTime createdAt;
     
@@ -60,6 +65,11 @@ public class PostResponse {
                 .tags(post.getTags())
                 .viewsCount(post.getViewsCount())
                 .upvotesCount(post.getUpvotesCount())
+                .downvotesCount(post.getDownvotesCount())
+                .latitude(post.getLatitude())
+                .longitude(post.getLongitude())
+                .locationAddress(post.getLocationAddress())
+                .status(post.getStatus())
                 .commentsCount(post.getCommentsCount())
                 .createdAt(post.getCreatedAt())
                 .build();
