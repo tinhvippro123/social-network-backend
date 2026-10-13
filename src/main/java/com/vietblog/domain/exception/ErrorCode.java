@@ -38,7 +38,23 @@ public enum ErrorCode {
 
     // --- Lỗi liên quan đến Tệp tin (File) ---
     FILE_EMPTY("Tệp tin tải lên không được để trống"),
-    FILE_UPLOAD_FAILED("Tải tệp tin lên hệ thống thất bại");
+    FILE_UPLOAD_FAILED("Tải tệp tin lên hệ thống thất bại"),
+
+    // --- Lỗi liên quan đến Quản trị & Báo cáo (Admin & Report) ---
+    PROTECTED_ADMIN_ACCOUNT("Tài khoản quản trị viên được bảo vệ, không thể thực hiện thao tác này"),
+    REPORT_NOT_FOUND("Báo cáo không tồn tại"),
+    REPORT_ALREADY_PENDING("Bạn đã có báo cáo đang chờ xử lý cho đối tượng này"),
+    REPORT_ALREADY_RESOLVED("Báo cáo này đã được xử lý trước đó"),
+
+    // --- Lỗi liên quan đến Nhóm (Group) ---
+    GROUP_NOT_FOUND("Nhóm không tồn tại"),
+
+    // --- Lỗi liên quan đến Tin nhắn & Cuộc trò chuyện (Chat) ---
+    CONVERSATION_NOT_FOUND("Cuộc trò chuyện không tồn tại"),
+    MESSAGE_NOT_FOUND("Tin nhắn không tồn tại"),
+
+    // --- Lỗi liên quan đến Thông báo (Notification) ---
+    NOTIFICATION_NOT_FOUND("Thông báo không tồn tại");
 
     private final String message;
 
