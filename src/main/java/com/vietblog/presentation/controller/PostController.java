@@ -11,7 +11,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
@@ -34,6 +33,8 @@ public class PostController {
     public ResponseEntity<ApiResponse<List<PostResponse>>> getPosts(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "latest") String sort) {
             
         if ("trending".equalsIgnoreCase(sort)) {
@@ -41,7 +42,7 @@ public class PostController {
             return ResponseEntity.ok(ApiResponse.success(trending, "Lấy danh sách thịnh hành thành công"));
         }
 
-        Page<PostResponse> postPage = postApplicationService.getLatestPosts(page, limit);
+        Page<PostResponse> postPage = postApplicationService.feed(page, limit, category, search);
         
         ApiResponse.Meta meta = new ApiResponse.Meta(page, limit, postPage.getTotalElements(), postPage.getTotalPages());
         ApiResponse<List<PostResponse>> response = ApiResponse.success(postPage.getContent(), "Lấy danh sách bài viết thành công");
@@ -51,8 +52,9 @@ public class PostController {
     }
     
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<PostResponse>> getPostById(@PathVariable String id) {
-        PostResponse response = postApplicationService.getPostById(id);
+    public ResponseEntity<ApiResponse<PostResponse>> getPostById(@PathVariable String id,
+            @AuthenticationPrincipal UserPrincipal user) {
+        PostResponse response = postApplicationService.getPostById(id, user == null ? null : user.getId());
         return ResponseEntity.ok(ApiResponse.success(response, "Lấy bài viết thành công"));
     }
 
@@ -71,5 +73,10 @@ public class PostController {
             @AuthenticationPrincipal UserPrincipal currentUser) {
         postApplicationService.deletePost(id, currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa bài viết thành công"));
+    }
+
+    @GetMapping("/trending")
+    public ResponseEntity<ApiResponse<List<PostResponse>>> trending(@RequestParam(defaultValue = "10") int limit) {
+        return ResponseEntity.ok(ApiResponse.success(postApplicationService.getTrendingPosts(limit), "Trending posts retrieved"));
     }
 }
