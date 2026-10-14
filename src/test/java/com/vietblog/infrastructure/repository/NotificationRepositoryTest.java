@@ -1,17 +1,12 @@
 package com.vietblog.infrastructure.repository;
 
-import com.vietblog.domain.entity.Category;
 import com.vietblog.domain.entity.Notification;
-import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
-import org.springframework.data.domain.PageRequest;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,10 +42,5 @@ class NotificationRepositoryTest {
         User user = User.builder().email(email).password("unused-test-password").name(email).build();
         entityManager.persist(user);
         return user;
-    }
-
-    private void persistPost(User author, Category category, String title, Post.PostStatus status, List<String> postTags) {
-        entityManager.persist(Post.builder().author(author).category(category).title(title).content("Test content")
-                .status(status).tags(postTags).build());
     }
 }

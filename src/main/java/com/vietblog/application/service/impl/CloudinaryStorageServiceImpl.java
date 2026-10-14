@@ -11,7 +11,6 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,17 +23,16 @@ public class CloudinaryStorageServiceImpl implements FileStorageService {
     private final Cloudinary cloudinary;
 
     @Override
+    @SuppressWarnings("unchecked")
     public String storeFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessRuleException(ErrorCode.FILE_EMPTY);
         }
 
         try {
-            // Generate a unique filename without extension to use as public_id
-            String originalFileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "";
             String publicId = "vietblog/" + UUID.randomUUID().toString();
 
-            Map<String, Object> uploadResult = cloudinary.uploader().upload(file.getBytes(),
+            Map<String, Object> uploadResult = (Map<String, Object>) cloudinary.uploader().upload(file.getBytes(),
                     ObjectUtils.asMap(
                             "public_id", publicId,
                             "resource_type", "auto" // Automatically detect if it's image or video
