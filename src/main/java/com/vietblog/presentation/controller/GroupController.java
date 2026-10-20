@@ -82,6 +82,22 @@ public class GroupController {
     public ApiResponse<Void> deletePost(@PathVariable String id, @PathVariable String postId, @AuthenticationPrincipal UserPrincipal user) {
         service.deletePost(id, postId, user.getId()); return ok(null);
     }
+    @PostMapping("/{id}/posts/{postId}/like")
+    public ApiResponse<GroupLikeResponse> toggleLike(@PathVariable String id, @PathVariable String postId, @AuthenticationPrincipal UserPrincipal user) {
+        return ok(service.togglePostLike(id, postId, user.getId()));
+    }
+    @GetMapping("/{id}/posts/{postId}/comments")
+    public ApiResponse<List<GroupCommentResponse>> comments(@PathVariable String id, @PathVariable String postId, @AuthenticationPrincipal UserPrincipal user) {
+        return ok(service.getComments(id, postId, user != null ? user.getId() : null));
+    }
+    @PostMapping("/{id}/posts/{postId}/comments")
+    public ApiResponse<GroupCommentResponse> addComment(@PathVariable String id, @PathVariable String postId, @AuthenticationPrincipal UserPrincipal user, @Valid @RequestBody GroupCommentRequest request) {
+        return ok(service.addComment(id, postId, user.getId(), request));
+    }
+    @DeleteMapping("/{id}/posts/{postId}/comments/{commentId}")
+    public ApiResponse<Void> deleteComment(@PathVariable String id, @PathVariable String postId, @PathVariable String commentId, @AuthenticationPrincipal UserPrincipal user) {
+        service.deleteComment(id, postId, commentId, user.getId()); return ok(null);
+    }
     private static <T> ApiResponse<T> ok(T data) { return ApiResponse.success(data, "Success"); }
     private static <T> ApiResponse<List<T>> paged(Page<T> page) {
         ApiResponse<List<T>> response = ok(page.getContent());

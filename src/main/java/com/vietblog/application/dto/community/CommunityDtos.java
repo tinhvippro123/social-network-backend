@@ -25,10 +25,23 @@ public final class CommunityDtos {
                                    @NotBlank @Size(max = 100000) String content,
                                    @Size(max = 1000) String excerpt, @Size(max = 255) String coverImage) {}
     public record GroupPostResponse(String id, String groupId, String title, String content, String excerpt,
-                                    String coverImage, PublicUser author, LocalDateTime createdAt, LocalDateTime updatedAt) {
+                                    String coverImage, PublicUser author, LocalDateTime createdAt, LocalDateTime updatedAt,
+                                    long likesCount, long commentsCount, @JsonProperty("isLiked") boolean isLiked) {
         public static GroupPostResponse from(GroupPost post) {
+            return from(post, 0, 0, false);
+        }
+        public static GroupPostResponse from(GroupPost post, long likesCount, long commentsCount, boolean isLiked) {
             return new GroupPostResponse(post.getId(), post.getGroup().getId(), post.getTitle(), post.getContent(),
-                    post.getExcerpt(), post.getCoverImage(), PublicUser.from(post.getAuthor()), post.getCreatedAt(), post.getUpdatedAt());
+                    post.getExcerpt(), post.getCoverImage(), PublicUser.from(post.getAuthor()), post.getCreatedAt(), post.getUpdatedAt(),
+                    likesCount, commentsCount, isLiked);
         }
     }
+    public record GroupCommentRequest(@NotBlank @Size(max = 2000) String content) {}
+    public record GroupCommentResponse(String id, String postId, String content, PublicUser author, LocalDateTime createdAt) {
+        public static GroupCommentResponse from(GroupPostComment comment) {
+            return new GroupCommentResponse(comment.getId(), comment.getPost().getId(), comment.getContent(),
+                    PublicUser.from(comment.getAuthor()), comment.getCreatedAt());
+        }
+    }
+    public record GroupLikeResponse(@JsonProperty("isLiked") boolean isLiked, long likesCount) {}
 }

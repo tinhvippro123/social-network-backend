@@ -16,6 +16,8 @@ public class GroupService {
     private final GroupRepository groups;
     private final GroupMemberRepository members;
     private final GroupPostRepository posts;
+    private final GroupPostLikeRepository postLikes;
+    private final GroupPostCommentRepository postComments;
     private final UserRepository users;
     private final HtmlSanitizer htmlSanitizer;
 
@@ -101,13 +103,13 @@ public class GroupService {
     @Transactional(readOnly = true)
     public Page<GroupPostResponse> posts(String id, String userId, int page, int limit) {
         requireReadable(group(id), userId);
-        return posts.findByGroupId(id, page(page, limit)).map(GroupPostResponse::from);
+        return posts.findByGroupId(id, page(page, limit)).map(p -> postResponse(p, userId));
     }
 
     @Transactional(readOnly = true)
     public GroupPostResponse post(String id, String postId, String userId) {
         requireReadable(group(id), userId);
-        return GroupPostResponse.from(findPost(id, postId));
+        return postResponse(findPost(id, postId), userId);
     }
 
     public GroupPostResponse createPost(String id, String userId, GroupPostRequest request) {
@@ -115,7 +117,7 @@ public class GroupService {
         GroupMember author = member(id, userId);
         GroupPost post = GroupPost.builder().group(group).author(author.getUser()).title(request.title().trim())
                 .content(htmlSanitizer.sanitize(request.content())).excerpt(request.excerpt()).coverImage(request.coverImage()).build();
-        return GroupPostResponse.from(posts.save(post));
+        return postResponse(posts.save(post), userId);
     }
 
     public GroupPostResponse updatePost(String id, String postId, String userId, GroupPostRequest request) {
@@ -128,7 +130,7 @@ public class GroupService {
         post.setExcerpt(request.excerpt());
         post.setCoverImage(request.coverImage());
         post.setUpdatedAt(LocalDateTime.now());
-        return GroupPostResponse.from(post);
+        return postResponse(post, userId);
     }
 
     public void deletePost(String id, String postId, String userId) {
@@ -136,7 +138,61 @@ public class GroupService {
         GroupMember actor = member(id, userId);
         GroupPost post = findPost(id, postId);
         if (!post.getAuthor().getId().equals(userId) && actor.getRole() == GroupMember.Role.MEMBER) forbidden();
+        postLikes.deleteByPostId(postId);
+        postComments.deleteByPostId(postId);
         posts.delete(post);
+    }
+
+    public GroupLikeResponse togglePostLike(String id, String postId, String userId) {
+        requireReadable(group(id), userId);
+        GroupPost post = findPost(id, postId);
+        var existing = postLikes.findByPostIdAndUserId(postId, userId);
+        boolean isLiked;
+        if (existing.isPresent()) {
+            postLikes.delete(existing.get());
+            isLiked = false;
+        } else {
+            postLikes.save(GroupPostLike.builder().post(post).user(user(userId)).build());
+            isLiked = true;
+        }
+        return new GroupLikeResponse(isLiked, postLikes.countByPostId(postId));
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<GroupCommentResponse> getComments(String id, String postId, String userId) {
+        requireReadable(group(id), userId);
+        findPost(id, postId);
+        return postComments.findByPostIdOrderByCreatedAtAsc(postId).stream().map(GroupCommentResponse::from).toList();
+    }
+
+    public GroupCommentResponse addComment(String id, String postId, String userId, GroupCommentRequest request) {
+        requireReadable(group(id), userId);
+        GroupPost post = findPost(id, postId);
+        GroupPostComment comment = GroupPostComment.builder()
+                .post(post)
+                .author(user(userId))
+                .content(htmlSanitizer.sanitize(request.content().trim()))
+                .build();
+        return GroupCommentResponse.from(postComments.save(comment));
+    }
+
+    public void deleteComment(String id, String postId, String commentId, String userId) {
+        lock(id);
+        findPost(id, postId);
+        GroupPostComment comment = postComments.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.COMMENT_NOT_FOUND));
+        GroupMember actor = member(id, userId);
+        if (!comment.getAuthor().getId().equals(userId) && actor.getRole() == GroupMember.Role.MEMBER) {
+            forbidden();
+        }
+        postComments.delete(comment);
+    }
+
+    private GroupPostResponse postResponse(GroupPost post, String userId) {
+        long likes = postLikes.countByPostId(post.getId());
+        long comments = postComments.countByPostId(post.getId());
+        boolean isLiked = userId != null && postLikes.existsByPostIdAndUserId(post.getId(), userId);
+        return GroupPostResponse.from(post, likes, comments, isLiked);
     }
 
     private GroupPost findPost(String groupId, String postId) {
