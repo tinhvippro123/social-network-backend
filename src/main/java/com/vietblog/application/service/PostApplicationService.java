@@ -129,7 +129,8 @@ public class PostApplicationService {
         
         postRepository.save(post);
         
-        return PostResponse.fromEntity(post);
+        int authorPostsCount = (int) postRepository.countByAuthorId(post.getAuthor().getId());
+        return PostResponse.fromEntity(post, authorPostsCount);
     }
 
     @Transactional
@@ -196,9 +197,25 @@ public class PostApplicationService {
     public Page<PostResponse> feed(int page, int limit, String category, String query) {
         validatePage(page, limit);
         if (query != null && query.length() > 1000) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
-        return postRepository.findFeed(category, query,
-                PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt", "id")))
-                .map(PostResponse::fromEntity);
+
+        boolean hasCategory = category != null && !category.isBlank() && !"all".equalsIgnoreCase(category.trim());
+        boolean hasQuery = query != null && !query.trim().isBlank();
+        PageRequest pageRequest = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+
+        Page<Post> postPage;
+        if (hasCategory && hasQuery) {
+            String pattern = "%" + query.trim().toLowerCase() + "%";
+            postPage = postRepository.findByCategoryAndKeyword(category.trim(), pattern, pageRequest);
+        } else if (hasCategory) {
+            postPage = postRepository.findByCategory(category.trim(), pageRequest);
+        } else if (hasQuery) {
+            String pattern = "%" + query.trim().toLowerCase() + "%";
+            postPage = postRepository.findByKeyword(pattern, pageRequest);
+        } else {
+            postPage = postRepository.findByStatus(Post.PostStatus.PUBLISHED, pageRequest);
+        }
+
+        return postPage.map(PostResponse::fromEntity);
     }
 
     private static void validatePage(int page, int limit) {

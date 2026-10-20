@@ -1,10 +1,7 @@
 package com.vietblog.presentation.controller;
 
 import com.vietblog.application.dto.ApiResponse;
-import com.vietblog.application.dto.auth.ChangePasswordRequest;
-import com.vietblog.application.dto.auth.JwtAuthenticationResponse;
-import com.vietblog.application.dto.auth.LoginRequest;
-import com.vietblog.application.dto.auth.RegisterRequest;
+import com.vietblog.application.dto.auth.*;
 import com.vietblog.application.dto.user.UpdateProfileRequest;
 import com.vietblog.application.dto.user.UserProfileResponse;
 import com.vietblog.application.service.AuthService;
@@ -62,6 +59,29 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(null, "Đăng ký thành công"));
     }
 
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<ForgotPasswordResponse>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        ForgotPasswordResponse response = authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Mã xác nhận đặt lại mật khẩu đã được tạo thành công"));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới"));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<JwtAuthenticationResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        JwtAuthenticationResponse response = authService.refreshToken(request.getToken());
+        return ResponseEntity.ok(ApiResponse.success(response, "Làm mới phiên đăng nhập thành công"));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout() {
+        return ResponseEntity.ok(ApiResponse.success(null, "Đăng xuất thành công"));
+    }
+
     @PutMapping("/me/password")
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
@@ -74,5 +94,12 @@ public class AuthController {
 
         authService.changePassword(principal.getName(), request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công"));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<JwtAuthenticationResponse>> googleLogin(
+            @Valid @RequestBody GoogleLoginRequest request) {
+        JwtAuthenticationResponse response = authService.loginWithGoogle(request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đăng nhập Google thành công"));
     }
 }

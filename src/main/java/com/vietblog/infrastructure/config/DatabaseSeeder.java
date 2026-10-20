@@ -45,6 +45,15 @@ public class DatabaseSeeder implements CommandLineRunner {
             log.info("Seeding Posts...");
             seedPosts();
         }
+
+        // Đảm bảo số lượng bài viết của tất cả người dùng luôn đồng bộ chính xác
+        userRepository.findAll().forEach(u -> {
+            int count = (int) postRepository.countByAuthorId(u.getId());
+            if (u.getPostsCount() != count) {
+                u.setPostsCount(count);
+                userRepository.save(u);
+            }
+        });
     }
 
     private void seedCategories() {

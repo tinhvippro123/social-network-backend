@@ -47,5 +47,9 @@ cors:
 # ── Cloudinary ────────────────────────────
 cloudinary:
   cloud-name: dan2b8knu
-  api-key: YOUR_API_KEY_HERE
-  api-secret: YOUR_API_SECRET_HERE
+  api-key: 432231466341726
+  api-secret: xBGOokPoQSU9TBt1ry7OMqWaz_s
+
+# ── Google OAuth ─────────────────────────
+google:
+  client-id: 806310825796-0j2uirp70vc33q93bjo0ecvns20aveu5.apps.googleusercontent.com

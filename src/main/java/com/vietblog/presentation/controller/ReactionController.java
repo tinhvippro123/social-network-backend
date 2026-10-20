@@ -34,4 +34,15 @@ public class ReactionController {
         Map<String, Long> summary = reactionService.getReactionSummary(postId);
         return ResponseEntity.ok(ApiResponse.success(summary, "Lấy thống kê cảm xúc thành công"));
     }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<String>> getCurrentUserReaction(
+            @PathVariable String postId,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.ok(ApiResponse.success(null, "Unauthenticated"));
+        }
+        String emoji = reactionService.getUserReaction(postId, currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success(emoji, "User reaction fetched"));
+    }
 }

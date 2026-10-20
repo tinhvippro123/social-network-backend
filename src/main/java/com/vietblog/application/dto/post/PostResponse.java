@@ -33,6 +33,9 @@ public class PostResponse {
         private String id;
         private String name;
         private String avatar;
+        private String bio;
+        private int postsCount;
+        private int followersCount;
     }
     
     @Data
@@ -45,6 +48,11 @@ public class PostResponse {
     }
 
     public static PostResponse fromEntity(Post post) {
+        int count = post.getAuthor() != null ? post.getAuthor().getPostsCount() : 0;
+        return fromEntity(post, count);
+    }
+
+    public static PostResponse fromEntity(Post post, int authorPostsCount) {
         return PostResponse.builder()
                 .id(post.getId())
                 .title(post.getTitle())
@@ -55,6 +63,9 @@ public class PostResponse {
                         .id(post.getAuthor().getId())
                         .name(post.getAuthor().getName())
                         .avatar(post.getAuthor().getAvatar())
+                        .bio(post.getAuthor().getBio())
+                        .postsCount(authorPostsCount)
+                        .followersCount(post.getAuthor().getFollowersCount())
                         .build())
                 .category(CategoryDto.builder()
                         .id(post.getCategory().getId())

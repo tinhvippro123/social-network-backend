@@ -89,4 +89,12 @@ public class ReactionService {
         }
         return summary;
     }
+
+    @Transactional(readOnly = true)
+    public String getUserReaction(String postId, String userId) {
+        if (userId == null) return null;
+        return reactionRepository.findByUserIdAndPostId(userId, postId)
+                .map(Reaction::getEmoji)
+                .orElse(null);
+    }
 }

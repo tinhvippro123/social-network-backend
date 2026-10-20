@@ -16,6 +16,8 @@ public enum ErrorCode {
     USER_ALREADY_EXISTS("Tên đăng nhập đã được sử dụng"),
     EMAIL_ALREADY_EXISTS("Email này đã được sử dụng"),
     CURRENT_PASSWORD_INCORRECT("Mật khẩu hiện tại không chính xác"),
+    INVALID_RESET_TOKEN("Mã xác nhận hoặc token đặt lại mật khẩu không hợp lệ"),
+    RESET_TOKEN_EXPIRED("Mã xác nhận hoặc token đặt lại mật khẩu đã hết hạn"),
     CANNOT_FOLLOW_SELF("Bạn không thể tự theo dõi chính mình"),
     
     // --- Lỗi liên quan đến Bài viết (Post) ---

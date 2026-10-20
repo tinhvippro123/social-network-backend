@@ -86,6 +86,15 @@ public class AdminService {
         return AdminDtos.PostResponse.from(posts.save(post));
     }
 
+    @Transactional
+    public void deleteUser(String id, String actorId) {
+        User user = users.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+        if (id.equals(actorId) || user.getRole() == User.Role.ADMIN) {
+            throw new BusinessRuleException(ErrorCode.PROTECTED_ADMIN_ACCOUNT);
+        }
+        users.delete(user);
+    }
+
     public static PageRequest page(int page, int limit, String sort) {
         if (page < 1 || limit < 1 || limit > 100) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
         return PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, sort, "id"));

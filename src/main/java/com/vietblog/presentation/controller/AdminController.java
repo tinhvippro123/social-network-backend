@@ -63,4 +63,10 @@ public class AdminController {
                                                         @Valid @RequestBody AdminDtos.PostStatusRequest request) {
         return ApiResponse.success(admin.changePostStatus(id, request.status()), "Post status updated");
     }
+
+    @DeleteMapping("/users/{id}")
+    public ApiResponse<Void> deleteUser(@PathVariable String id, @AuthenticationPrincipal UserPrincipal currentUser) {
+        admin.deleteUser(id, currentUser.getId());
+        return ApiResponse.success(null, "User deleted");
+    }
 }
