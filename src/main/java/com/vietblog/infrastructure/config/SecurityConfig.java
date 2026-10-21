@@ -53,6 +53,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/tags/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/search/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/search/image", "/api/search/document").permitAll()
                 .requestMatchers("/api/users/me").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/users/**").permitAll()
                 .anyRequest().authenticated()

@@ -40,13 +40,11 @@ public class SearchController {
     }
 
     @PostMapping(value = "/search/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("isAuthenticated()")
     public ApiResponse<List<PostResponse>> image(@RequestParam MultipartFile image, @RequestParam(defaultValue = "20") int limit) {
         return ApiResponse.success(search.searchImage(image, limit), "Search completed");
     }
 
     @PostMapping(value = "/search/document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("isAuthenticated()")
     public ApiResponse<List<PostResponse>> document(@RequestParam MultipartFile file, @RequestParam(defaultValue = "20") int limit) {
         return ApiResponse.success(search.searchDocument(file, limit), "Search completed");
     }
