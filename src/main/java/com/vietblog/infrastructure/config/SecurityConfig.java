@@ -56,6 +56,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/search/image", "/api/search/document").permitAll()
                 .requestMatchers("/api/users/me").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/users/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/groups/**").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

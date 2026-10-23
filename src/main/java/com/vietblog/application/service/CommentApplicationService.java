@@ -67,8 +67,16 @@ public class CommentApplicationService {
         post.setCommentsCount(post.getCommentsCount() + 1);
         postDomainService.calculateTrendingScore(post);
         if (!post.getAuthor().getId().equals(authorId)) {
-            notifications.save(Notification.builder().user(post.getAuthor()).type(Notification.NotificationType.COMMENT)
-                    .message(author.getName() + " commented on your post").avatar(author.getAvatar()).link("/posts/" + postId).build());
+            String notifMsg = (parentComment == null)
+                    ? author.getName() + " đã bình luận về bài viết của bạn"
+                    : author.getName() + " đã trả lời bình luận của bạn";
+            notifications.save(Notification.builder()
+                    .user(post.getAuthor())
+                    .type(Notification.NotificationType.COMMENT)
+                    .message(notifMsg)
+                    .avatar(author.getAvatar())
+                    .link("/posts/" + postId + "#comment-" + comment.getId())
+                    .build());
         }
 
         // Lấy lại từ DB để lấy được toàn bộ context nếu cần (đặc biệt khi lưu xong)

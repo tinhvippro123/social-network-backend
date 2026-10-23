@@ -9,10 +9,38 @@ import java.util.stream.IntStream;
 public final class TextAlgorithms {
     private static final Pattern TAGS = Pattern.compile("<[^>]*>");
     private static final Pattern WORDS = Pattern.compile("[\\p{L}\\p{N}]+");
-    private static final Set<String> STOP = Set.of("và", "là", "của", "có", "cho", "các", "một", "những", "được", "trong", "với", "để", "the", "a", "an", "and", "or", "is", "of", "to", "in", "for");
-    private static final Set<String> POSITIVE = Set.of("tốt", "hay", "đẹp", "thích", "yêu", "tuyệt", "vui", "good", "great", "excellent", "love", "helpful", "awesome");
-    private static final Set<String> NEGATIVE = Set.of("tệ", "xấu", "ghét", "buồn", "chán", "kém", "dở", "bad", "awful", "hate", "terrible", "useless", "poor");
-    private static final Set<String> NEGATION = Set.of("không", "chẳng", "chưa", "not", "never", "no");
+    private static final Set<String> STOP = loadWords("/nlp/stopwords.txt", Set.of("và", "là", "của", "có", "cho", "các", "một", "những", "được", "trong", "với", "để", "the", "a", "an", "and", "or", "is", "of", "to", "in", "for"));
+    private static final Set<String> POSITIVE = loadWords("/nlp/positive_words.txt", Set.of(
+            "tốt", "hay", "đẹp", "thích", "yêu", "tuyệt", "vui", "đỉnh", "chuẩn", "xịn", "mê", "ngon", "giỏi", "pro",
+            "chất", "siêu", "bổ", "quý", "mượt", "nhanh", "sạch", "good", "great", "excellent", "love", "helpful",
+            "awesome", "best", "amazing", "wonderful", "perfect", "fantastic", "super", "nice", "clean", "fast"
+    ));
+    private static final Set<String> NEGATIVE = loadWords("/nlp/offensive_words.txt", Set.of(
+            "tệ", "xấu", "ghét", "buồn", "chán", "kém", "dở", "ngu", "dốt", "đần", "ngốc", "khùng", "điên", "rác",
+            "nhảm", "tồi", "xàm", "lố", "hãm", "phế", "chó", "cút", "bậy", "láo", "ác", "lừa", "xạo", "nhục", "cùi",
+            "ức", "bực", "bẩn", "bad", "awful", "hate", "terrible", "useless", "poor", "trash", "stupid", "idiot",
+            "dumb", "horrible", "worst", "disgusting", "annoying", "fake", "scam", "cheat", "spam"
+    ));
+    private static final Set<String> NEGATION = Set.of("không", "chẳng", "chưa", "hổng", "chả", "not", "never", "no");
+
+    private static Set<String> loadWords(String resourcePath, Set<String> fallback) {
+        Set<String> set = new HashSet<>(fallback);
+        try (var is = TextAlgorithms.class.getResourceAsStream(resourcePath)) {
+            if (is != null) {
+                try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        line = line.trim();
+                        if (line.isEmpty() || line.startsWith("#")) continue;
+                        set.add(Normalizer.normalize(line, Normalizer.Form.NFC).toLowerCase(Locale.ROOT));
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // keep fallback
+        }
+        return Collections.unmodifiableSet(set);
+    }
 
     private TextAlgorithms() {}
 
@@ -97,10 +125,27 @@ public final class TextAlgorithms {
         List<String> words = tokens(text);
         int positive = 0, negative = 0;
         for (int i = 0; i < words.size(); i++) {
-            int sign = POSITIVE.contains(words.get(i)) ? 1 : NEGATIVE.contains(words.get(i)) ? -1 : 0;
+            String word = words.get(i);
+            int sign = 0;
+            boolean isBigram = false;
+            if (i + 1 < words.size()) {
+                String bigram = word + " " + words.get(i + 1);
+                if (POSITIVE.contains(bigram)) {
+                    sign = 1;
+                    isBigram = true;
+                } else if (NEGATIVE.contains(bigram)) {
+                    sign = -1;
+                    isBigram = true;
+                }
+            }
+            if (sign == 0) {
+                if (POSITIVE.contains(word)) sign = 1;
+                else if (NEGATIVE.contains(word)) sign = -1;
+            }
             if (sign == 0) continue;
             for (int j = Math.max(0, i - 2); j < i; j++) if (NEGATION.contains(words.get(j))) { sign = -sign; break; }
             if (sign > 0) positive++; else negative++;
+            if (isBigram) i++;
         }
         double score = positive + negative == 0 ? 0 : (double) (positive - negative) / (positive + negative);
         return new Sentiment(score > 0 ? "positive" : score < 0 ? "negative" : "neutral", score, positive, negative, "lexicon-v1");
