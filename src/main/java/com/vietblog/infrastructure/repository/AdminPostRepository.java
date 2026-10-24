@@ -21,6 +21,8 @@ public interface AdminPostRepository extends JpaRepository<Post, String> {
 
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime from, LocalDateTime to);
 
+    long countByAuthorId(String authorId);
+
     @Query("select coalesce(sum(p.viewsCount), 0) from Post p")
     long countTotalViews();
 }

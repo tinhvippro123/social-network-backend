@@ -51,7 +51,11 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public Page<AdminDtos.UserResponse> users(User.Role role, String search, int page, int limit) {
-        return users.search(role, search.trim(), page(page, limit, "joinedAt")).map(AdminDtos.UserResponse::from);
+        return users.search(role, search.trim(), page(page, limit, "joinedAt")).map(this::toUserResponse);
+    }
+
+    private AdminDtos.UserResponse toUserResponse(User user) {
+        return AdminDtos.UserResponse.from(user, posts.countByAuthorId(user.getId()));
     }
 
     @Transactional(readOnly = true)
@@ -66,7 +70,7 @@ public class AdminService {
             throw new BusinessRuleException(ErrorCode.PROTECTED_ADMIN_ACCOUNT);
         }
         user.setRole(role);
-        return AdminDtos.UserResponse.from(users.save(user));
+        return toUserResponse(users.save(user));
     }
 
     @Transactional
@@ -76,7 +80,7 @@ public class AdminService {
             throw new BusinessRuleException(ErrorCode.PROTECTED_ADMIN_ACCOUNT);
         }
         user.setActive(!banned);
-        return AdminDtos.UserResponse.from(users.save(user));
+        return toUserResponse(users.save(user));
     }
 
     @Transactional

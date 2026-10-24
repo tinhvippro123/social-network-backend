@@ -180,9 +180,14 @@ public class PostApplicationService {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
 
-        // Kiểm tra quyền sở hữu: Chỉ tác giả mới được xóa bài viết
+        // Kiểm tra quyền: tác giả hoặc quản trị viên (ADMIN) mới được xóa bài viết
         if (!post.getAuthor().getId().equals(userId)) {
-            throw new ForbiddenException(ErrorCode.FORBIDDEN);
+            boolean isAdmin = userRepository.findById(userId)
+                    .map(u -> u.getRole() == User.Role.ADMIN)
+                    .orElse(false);
+            if (!isAdmin) {
+                throw new ForbiddenException(ErrorCode.FORBIDDEN);
+            }
         }
 
         imageFeatures.findById(id).ifPresent(imageFeatures::delete);
