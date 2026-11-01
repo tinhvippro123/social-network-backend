@@ -22,8 +22,8 @@ public class AdminController {
     private final AdminService admin;
 
     @GetMapping("/stats")
-    public ApiResponse<AdminDtos.Stats> stats() {
-        return ApiResponse.success(admin.stats(), "Dashboard statistics");
+    public ApiResponse<AdminDtos.Stats> stats(@RequestParam(defaultValue = "7") int days) {
+        return ApiResponse.success(admin.stats(days), "Dashboard statistics");
     }
 
     @GetMapping("/users")

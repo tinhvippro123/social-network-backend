@@ -125,6 +125,22 @@ public class ChatService {
         }
     }
 
+    public void setNickname(String id, String userId, String targetUserId, String nickname) {
+        member(id, userId);
+        List<ConversationMember> participants = members.findByConversationId(id);
+        String target = (targetUserId != null && !targetUserId.isBlank()) ? targetUserId
+                : participants.stream().filter(m -> !m.getUser().getId().equals(userId)).map(m -> m.getUser().getId()).findFirst().orElse(userId);
+        ConversationMember targetMember = members.findByConversationIdAndUserId(id, target)
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+        String cleaned = (nickname == null || nickname.isBlank()) ? null : nickname.trim();
+        targetMember.setNickname(cleaned);
+        members.save(targetMember);
+        for (ConversationMember recipient : participants) {
+            events.publishEvent(new ChatEvent("conversation.nickname", id, recipient.getUser().getId(),
+                    Map.of("targetUserId", target, "nickname", cleaned != null ? cleaned : "")));
+        }
+    }
+
     public void block(String actorId, String targetId, boolean blocked) {
         if (actorId.equals(targetId)) invalid();
         User actor = user(actorId);
@@ -169,14 +185,19 @@ public class ChatService {
     }
 
     private ConversationResponse conversation(Conversation conversation, ConversationMember viewer) {
-        List<PublicUser> participants = members.findByConversationId(conversation.getId()).stream().map(m -> PublicUser.from(m.getUser())).toList();
+        List<ConversationMember> allMembers = members.findByConversationId(conversation.getId());
+        List<PublicUser> participants = allMembers.stream().map(m -> PublicUser.from(m.getUser())).toList();
         PublicUser other = participants.stream().filter(u -> !u.id().equals(viewer.getUser().getId())).findFirst().orElse(PublicUser.from(viewer.getUser()));
+        ConversationMember otherMember = allMembers.stream().filter(m -> !m.getUser().getId().equals(viewer.getUser().getId())).findFirst().orElse(viewer);
+        String nickname = conversation.isGroupChat() ? null : otherMember.getNickname();
+        String displayName = conversation.isGroupChat() ? conversation.getName()
+                : (nickname != null && !nickname.isBlank() ? nickname : other.name());
         ChatMessage latest = messages.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId()).orElse(null);
-        return new ConversationResponse(conversation.getId(), conversation.isGroupChat() ? conversation.getName() : other.name(),
+        return new ConversationResponse(conversation.getId(), displayName,
                 conversation.isGroupChat() ? null : other.avatar(), latest == null || latest.isRevoked() ? "" : latest.getContent(),
                 latest == null ? conversation.getCreatedAt() : latest.getCreatedAt(),
                 messages.countUnread(conversation.getId(), viewer.getUser().getId(), viewer.getLastReadAt()), conversation.isGroupChat(), false,
-                viewer.isPinned(), viewer.isMuted(), participants);
+                viewer.isPinned(), viewer.isMuted(), participants, nickname);
     }
 
     private MessageResponse message(ChatMessage message, String userId, List<ConversationMember> participants) {

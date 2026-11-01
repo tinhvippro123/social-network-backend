@@ -19,4 +19,6 @@ public class ConversationMember {
     private boolean pinned;
     private boolean muted;
     private boolean hidden;
+    @Column(length = 50)
+    private String nickname;
 }

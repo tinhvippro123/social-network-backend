@@ -94,7 +94,10 @@ public final class TextAlgorithms {
 
     /** Weighted TextRank with dangling-node redistribution; selected sentences retain source order. */
     public static List<String> summarize(String text, int count) {
-        String[] sentences = Arrays.stream(plainText(text).split("(?<=[.!?。！？])\\s+"))
+        String proseSource = text == null ? "" : text.replaceAll("(?is)<(pre|h[1-6])\\b[^>]*>.*?</\\1>", " ");
+        String extracted = plainText(proseSource);
+        if (extracted.isEmpty()) extracted = plainText(text);
+        String[] sentences = Arrays.stream(extracted.split("(?i)(?<!\\b(?:tp|ts|gs|bs|ks|cn|dr|mr|ms|st)\\.)(?<!\\b(?:ths|pgs)\\.)(?<=[.!?。！？])\\s+"))
                 .map(String::trim).filter(s -> !s.isEmpty()).limit(200).toArray(String[]::new);
         int n = sentences.length;
         if (n <= count) return List.of(sentences);

@@ -23,4 +23,6 @@ public interface AdminUserRepository extends JpaRepository<User, String> {
     Optional<User> findLockedById(@Param("id") String id);
 
     long countByJoinedAtGreaterThanEqualAndJoinedAtLessThan(LocalDateTime from, LocalDateTime to);
+
+    java.util.List<User> findTop5ByOrderByJoinedAtDesc();
 }

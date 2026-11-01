@@ -15,11 +15,12 @@ public final class ChatDtos {
                               @Size(max = 255) String fileName, @Size(max = 255) String fileSize,
                               @Size(max = 2000) String fileUrl, @Size(max = 2000) String imageUrl) {}
     public record FlagRequest(boolean value) {}
+    public record NicknameRequest(@Size(max = 50) String nickname, String targetUserId) {}
     public record ConversationResponse(String id, String name, String avatar, String lastMessage,
                                         LocalDateTime lastMessageTime, long unreadCount,
                                         @JsonProperty("isGroup") boolean isGroup, @JsonProperty("isOnline") boolean isOnline,
                                         @JsonProperty("isPinned") boolean isPinned, @JsonProperty("isMuted") boolean isMuted,
-                                        List<PublicUser> participants) {}
+                                        List<PublicUser> participants, String nickname) {}
     public record ReplyResponse(String id, String content, String senderName) {}
     public record ReadReceipt(PublicUser user, LocalDateTime readAt) {}
     public record MessageResponse(String id, String conversationId, String content, PublicUser sender,

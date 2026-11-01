@@ -44,6 +44,12 @@ public class ChatController {
     public ApiResponse<Void> mute(@PathVariable String id, @AuthenticationPrincipal UserPrincipal user, @RequestBody FlagRequest request) {
         service.preference(id, user.getId(), "mute", request.value()); return ok(null);
     }
+    @PatchMapping("/conversations/{id}/nickname")
+    public ApiResponse<Void> updateNickname(@PathVariable String id, @AuthenticationPrincipal UserPrincipal user,
+            @Valid @RequestBody NicknameRequest request) {
+        service.setNickname(id, user.getId(), request.targetUserId(), request.nickname());
+        return ok(null);
+    }
     @DeleteMapping("/conversations/{id}")
     public ApiResponse<Void> hide(@PathVariable String id, @AuthenticationPrincipal UserPrincipal user) {
         service.preference(id, user.getId(), "hide", true); return ok(null);

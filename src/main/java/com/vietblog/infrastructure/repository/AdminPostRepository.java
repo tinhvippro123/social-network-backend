@@ -25,4 +25,13 @@ public interface AdminPostRepository extends JpaRepository<Post, String> {
 
     @Query("select coalesce(sum(p.viewsCount), 0) from Post p")
     long countTotalViews();
+
+    /** [name, icon, count] — số bài đã đăng theo danh mục, giảm dần */
+    @Query("select c.name, c.icon, count(p) from Post p join p.category c " +
+            "where p.status = com.vietblog.domain.entity.Post.PostStatus.PUBLISHED " +
+            "group by c.id, c.name, c.icon order by count(p) desc")
+    java.util.List<Object[]> countByCategory(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"author"})
+    java.util.List<Post> findTop5ByOrderByCreatedAtDesc();
 }
