@@ -41,8 +41,12 @@ public class ChatService {
         Set<String> ids = new TreeSet<>(request.participantIds());
         ids.add(userId);
         if (ids.size() < 2 || ids.size() > 50 || (!request.isGroup() && ids.size() != 2)) invalid();
-        if (request.isGroup() && (request.name() == null || request.name().isBlank())) invalid();
         List<User> participants = ids.stream().map(this::user).toList();
+        String resolvedName = request.name();
+        if (request.isGroup() && (resolvedName == null || resolvedName.isBlank())) {
+            String joinedNames = participants.stream().map(User::getName).reduce((a, b) -> a + ", " + b).orElse("Nhóm chat");
+            resolvedName = "Nhóm: " + (joinedNames.length() > 80 ? joinedNames.substring(0, 80) : joinedNames);
+        }
         String directKey = request.isGroup() ? null : String.join(":", ids);
         if (!request.isGroup()) {
             requireUnblocked(participants.get(0).getId(), participants.get(1).getId());
@@ -55,7 +59,7 @@ public class ChatService {
                 return conversation(existing.get(), membership);
             }
         }
-        Conversation conversation = conversations.save(Conversation.builder().creator(creator).name(request.name())
+        Conversation conversation = conversations.save(Conversation.builder().creator(creator).name(resolvedName)
                 .groupChat(request.isGroup()).directKey(directKey).build());
         for (User participant : participants) members.save(ConversationMember.builder().conversation(conversation).user(participant).build());
         for (ConversationMember recipient : members.findByConversationId(conversation.getId())) {
