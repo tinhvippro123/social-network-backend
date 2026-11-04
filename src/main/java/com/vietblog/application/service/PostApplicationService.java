@@ -103,13 +103,18 @@ public class PostApplicationService {
 
     @Transactional(readOnly = true)
     public List<PostResponse> getTrendingPosts(int limit) {
+        return getTrendingPosts(limit, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PostResponse> getTrendingPosts(int limit, String viewerId) {
         validatePage(1, limit);
         // Recalculate decay at read time so quiet posts cannot retain stale rankings.
         return postRepository.findByStatus(Post.PostStatus.PUBLISHED, Pageable.unpaged())
                 .stream().peek(postDomainService::calculateTrendingScore)
                 .sorted(Comparator.comparingDouble(Post::getTrendingScore).reversed().thenComparing(Post::getId))
                 .limit(limit)
-                .map(PostResponse::fromEntity)
+                .map(post -> mapPostResponse(post, viewerId))
                 .collect(Collectors.toList());
     }
     
@@ -134,8 +139,7 @@ public class PostApplicationService {
         
         postRepository.save(post);
         
-        int authorPostsCount = (int) postRepository.countByAuthorId(post.getAuthor().getId());
-        return PostResponse.fromEntity(post, authorPostsCount);
+        return mapPostResponse(post, viewerId);
     }
 
     @Transactional
@@ -181,7 +185,7 @@ public class PostApplicationService {
 
         Post updatedPost = postRepository.save(post);
         coverImageIndexer.scheduleAfterCommit(updatedPost.getId());
-        return PostResponse.fromEntity(updatedPost);
+        return mapPostResponse(updatedPost, userId);
     }
 
     @Transactional
@@ -209,6 +213,11 @@ public class PostApplicationService {
 
     @Transactional(readOnly = true)
     public Page<PostResponse> feed(int page, int limit, String category, String query) {
+        return feed(page, limit, category, query, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PostResponse> feed(int page, int limit, String category, String query, String viewerId) {
         validatePage(page, limit);
         if (query != null && query.length() > 1000) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
 
@@ -229,7 +238,15 @@ public class PostApplicationService {
             postPage = postRepository.findByStatus(Post.PostStatus.PUBLISHED, pageRequest);
         }
 
-        return postPage.map(PostResponse::fromEntity);
+        return postPage.map(post -> mapPostResponse(post, viewerId));
+    }
+
+    private PostResponse mapPostResponse(Post post, String viewerId) {
+        int authorPostsCount = post.getAuthor() != null
+                ? Math.max(post.getAuthor().getPostsCount(), (int) postRepository.countByAuthorId(post.getAuthor().getId()))
+                : 0;
+        boolean isBookmarked = viewerId != null && bookmarks.existsByUserIdAndPostId(viewerId, post.getId());
+        return PostResponse.fromEntity(post, authorPostsCount, isBookmarked);
     }
 
     private static void validatePage(int page, int limit) {

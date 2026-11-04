@@ -27,6 +27,7 @@ public class PostResponse {
     private LocalDateTime eventEndTime;
     private Post.PostStatus status;
     private int commentsCount;
+    private boolean bookmarked;
     private LocalDateTime createdAt;
     
     @Data
@@ -51,10 +52,14 @@ public class PostResponse {
 
     public static PostResponse fromEntity(Post post) {
         int count = post.getAuthor() != null ? post.getAuthor().getPostsCount() : 0;
-        return fromEntity(post, count);
+        return fromEntity(post, count, false);
     }
 
     public static PostResponse fromEntity(Post post, int authorPostsCount) {
+        return fromEntity(post, authorPostsCount, false);
+    }
+
+    public static PostResponse fromEntity(Post post, int authorPostsCount, boolean bookmarked) {
         return PostResponse.builder()
                 .id(post.getId())
                 .title(post.getTitle())
@@ -86,6 +91,7 @@ public class PostResponse {
                 .eventEndTime(post.getEventEndTime())
                 .status(post.getStatus())
                 .commentsCount(post.getCommentsCount())
+                .bookmarked(bookmarked)
                 .createdAt(post.getCreatedAt())
                 .build();
     }

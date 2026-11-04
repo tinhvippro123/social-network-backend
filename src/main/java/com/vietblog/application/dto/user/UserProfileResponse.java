@@ -1,5 +1,6 @@
 package com.vietblog.application.dto.user;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.vietblog.domain.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,7 +24,9 @@ public class UserProfileResponse {
     private int postsCount;
     private int followersCount;
     private int followingCount;
+    @JsonProperty("isFollowing")
     private boolean isFollowing;
+    @JsonProperty("isMe")
     private boolean isMe;
 
     public static UserProfileResponse fromEntity(User user, boolean isFollowing, boolean isMe, int accuratePostsCount) {

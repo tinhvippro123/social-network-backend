@@ -110,7 +110,8 @@ public class UserApplicationService {
         return followers.stream()
                 .map(u -> {
                     boolean isFollowing = currentUserId != null && userRepository.isFollowing(u.getId(), currentUserId);
-                    return UserSummaryResponse.fromEntity(u, isFollowing);
+                    int postsCount = Math.max(u.getPostsCount(), (int) postRepository.countByAuthorId(u.getId()));
+                    return UserSummaryResponse.fromEntity(u, isFollowing, postsCount);
                 })
                 .toList();
     }
@@ -125,7 +126,8 @@ public class UserApplicationService {
         return following.stream()
                 .map(u -> {
                     boolean isFollowing = currentUserId != null && userRepository.isFollowing(u.getId(), currentUserId);
-                    return UserSummaryResponse.fromEntity(u, isFollowing);
+                    int postsCount = Math.max(u.getPostsCount(), (int) postRepository.countByAuthorId(u.getId()));
+                    return UserSummaryResponse.fromEntity(u, isFollowing, postsCount);
                 })
                 .toList();
     }
@@ -139,7 +141,8 @@ public class UserApplicationService {
                 .filter(u -> currentUserId == null || !u.getId().equals(currentUserId))
                 .map(u -> {
                     boolean isFollowing = currentUserId != null && userRepository.isFollowing(u.getId(), currentUserId);
-                    return UserSummaryResponse.fromEntity(u, isFollowing);
+                    int postsCount = Math.max(u.getPostsCount(), (int) postRepository.countByAuthorId(u.getId()));
+                    return UserSummaryResponse.fromEntity(u, isFollowing, postsCount);
                 })
                 .toList();
     }
