@@ -15,6 +15,7 @@ public class CommentResponse {
     private String content;
     private String authorId;
     private String authorName;
+    private String authorAvatar;
     private int upvotes;
     private int downvotes;
     private LocalDateTime createdAt;
@@ -32,6 +33,7 @@ public class CommentResponse {
                 .content(comment.getContent())
                 .authorId(comment.getAuthor().getId())
                 .authorName(comment.getAuthor().getName())
+                .authorAvatar(comment.getAuthor().getAvatar())
                 .upvotes(comment.getUpvotes())
                 .downvotes(comment.getDownvotes())
                 .createdAt(comment.getCreatedAt())
