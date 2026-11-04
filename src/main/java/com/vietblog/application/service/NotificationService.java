@@ -41,6 +41,11 @@ public class NotificationService {
         return notifications.markAllRead(userId);
     }
 
+    @Transactional
+    public void delete(String id, String userId) {
+        notifications.deleteByIdAndUserId(id, userId);
+    }
+
     /** Internal event delivery; callers must derive the recipient from a persisted domain relationship. */
     @Transactional
     public void notify(User recipient, Notification.NotificationType type, String message, String avatar, String link) {

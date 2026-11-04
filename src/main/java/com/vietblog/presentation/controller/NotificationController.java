@@ -45,4 +45,10 @@ public class NotificationController {
     public ApiResponse<Map<String, Integer>> readAll(@AuthenticationPrincipal UserPrincipal currentUser) {
         return ApiResponse.success(Map.of("updated", notifications.markAllRead(currentUser.getId())), "Notifications marked read");
     }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Object> delete(@PathVariable String id, @AuthenticationPrincipal UserPrincipal currentUser) {
+        notifications.delete(id, currentUser.getId());
+        return ApiResponse.success(null, "Notification deleted");
+    }
 }

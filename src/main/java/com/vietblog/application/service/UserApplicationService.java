@@ -146,12 +146,22 @@ public class UserApplicationService {
 
     @Transactional(readOnly = true)
     public Page<PostResponse> getUserPosts(String targetUserId, int page, int limit) {
+        return getUserPosts(targetUserId, page, limit, "PUBLISHED", null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PostResponse> getUserPosts(String targetUserId, int page, int limit, String status, String viewerId) {
         if (!userRepository.existsById(targetUserId)) {
             throw new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND);
         }
 
+        Post.PostStatus postStatus = Post.PostStatus.PUBLISHED;
+        if ("DRAFT".equalsIgnoreCase(status) && viewerId != null && viewerId.equals(targetUserId)) {
+            postStatus = Post.PostStatus.DRAFT;
+        }
+
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), limit, Sort.by("createdAt").descending());
-        Page<Post> postPage = postRepository.findByAuthorIdAndStatus(targetUserId, Post.PostStatus.PUBLISHED, pageable);
+        Page<Post> postPage = postRepository.findByAuthorIdAndStatus(targetUserId, postStatus, pageable);
 
         return postPage.map(PostResponse::fromEntity);
     }
