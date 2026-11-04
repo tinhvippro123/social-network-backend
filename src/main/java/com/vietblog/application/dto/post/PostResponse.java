@@ -23,6 +23,8 @@ public class PostResponse {
     private Double latitude;
     private Double longitude;
     private String locationAddress;
+    private LocalDateTime eventStartTime;
+    private LocalDateTime eventEndTime;
     private Post.PostStatus status;
     private int commentsCount;
     private LocalDateTime createdAt;
@@ -80,6 +82,8 @@ public class PostResponse {
                 .latitude(post.getLatitude())
                 .longitude(post.getLongitude())
                 .locationAddress(post.getLocationAddress())
+                .eventStartTime(post.getEventStartTime())
+                .eventEndTime(post.getEventEndTime())
                 .status(post.getStatus())
                 .commentsCount(post.getCommentsCount())
                 .createdAt(post.getCreatedAt())

@@ -32,6 +32,7 @@ public class CategoryApplicationService {
         Category category = Category.builder()
                 .name(request.getName())
                 .description(request.getDescription())
+                .icon(request.getIcon() != null && !request.getIcon().isBlank() ? request.getIcon().trim() : "📁")
                 .build();
 
         // Uỷ quyền cho Domain Service tạo Slug
@@ -70,6 +71,9 @@ public class CategoryApplicationService {
         }
 
         category.setDescription(request.getDescription());
+        if (request.getIcon() != null && !request.getIcon().isBlank()) {
+            category.setIcon(request.getIcon().trim());
+        }
         
         Category updatedCategory = categoryRepository.save(category);
         return CategoryResponse.fromEntity(updatedCategory);

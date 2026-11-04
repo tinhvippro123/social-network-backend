@@ -105,6 +105,7 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public Page<AdminDtos.PostResponse> posts(Post.PostStatus status, String search, int page, int limit) {
         Page<Post> paged = posts.search(status, search.trim(), page(page, limit, "createdAt"));
         if (paged.isEmpty()) {
@@ -139,6 +140,7 @@ public class AdminService {
     }
 
     @Transactional
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public AdminDtos.PostResponse changePostStatus(String id, Post.PostStatus status) {
         Post post = posts.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
         post.setStatus(status);

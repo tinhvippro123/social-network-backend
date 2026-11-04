@@ -49,6 +49,7 @@ public class AdminController {
     }
 
     @GetMapping("/posts")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public ApiResponse<List<AdminDtos.PostResponse>> posts(
             @RequestParam(required = false) Post.PostStatus status, @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int limit) {
@@ -59,6 +60,7 @@ public class AdminController {
     }
 
     @PatchMapping("/posts/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public ApiResponse<AdminDtos.PostResponse> postStatus(@PathVariable String id,
                                                         @Valid @RequestBody AdminDtos.PostStatusRequest request) {
         return ApiResponse.success(admin.changePostStatus(id, request.status()), "Post status updated");

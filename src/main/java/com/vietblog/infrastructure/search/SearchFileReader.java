@@ -14,15 +14,28 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.Locale;
+import java.util.Set;
 import java.util.zip.ZipInputStream;
 
 @Component
 public class SearchFileReader {
     public static final int MAX_BYTES = 5 * 1024 * 1024;
     public static final int MAX_TEXT = 100_000;
+
+    /** Hosts whose cover images may be fetched server-side for indexing (SSRF guard). */
+    private static final Set<String> TRUSTED_IMAGE_HOSTS = Set.of("images.unsplash.com", "res.cloudinary.com");
+    private static final HttpClient HTTP = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
 
     public byte[] readBounded(MultipartFile file) {
         if (file == null || file.isEmpty() || file.getSize() > MAX_BYTES) throw invalid();
@@ -34,7 +47,52 @@ public class SearchFileReader {
     }
 
     public BufferedImage image(MultipartFile file) {
-        byte[] bytes = readBounded(file);
+        return decodeImage(readBounded(file));
+    }
+
+    /**
+     * Fetch a cover image from a trusted HTTPS host and decode it with the same bounded
+     * decoder used for uploads. Returns null when the URL is not eligible or unreachable,
+     * so indexing is always best-effort and never breaks post publishing.
+     */
+    public BufferedImage imageFromUrl(String url) {
+        URI uri = trustedImageUri(url);
+        if (uri == null) return null;
+        try {
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Accept", "image/jpeg,image/png")
+                    .GET().build();
+            HttpResponse<InputStream> response = HTTP.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream input = response.body()) {
+                if (response.statusCode() != 200) return null;
+                byte[] bytes = input.readNBytes(MAX_BYTES + 1);
+                if (bytes.length == 0 || bytes.length > MAX_BYTES) return null;
+                return decodeImage(bytes);
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (IOException | RuntimeException ex) {
+            return null;
+        }
+    }
+
+    static URI trustedImageUri(String url) {
+        if (url == null || url.isBlank()) return null;
+        URI uri;
+        try { uri = URI.create(url.trim()); } catch (IllegalArgumentException ex) { return null; }
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) return null;
+        String host = uri.getHost().toLowerCase(Locale.ROOT);
+        if (!TRUSTED_IMAGE_HOSTS.contains(host)) return null;
+        if (host.equals("images.unsplash.com")) {
+            // Ask Unsplash for a small JPEG explicitly: the JDK decoder cannot read WebP/AVIF.
+            return URI.create("https://images.unsplash.com" + uri.getRawPath() + "?fm=jpg&w=512&q=70&fit=crop");
+        }
+        return uri;
+    }
+
+    private BufferedImage decodeImage(byte[] bytes) {
         // Decode only formats supported by the standard JDK, never URLs or external resources.
         try (var input = new MemoryCacheImageInputStream(new ByteArrayInputStream(bytes))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);

@@ -51,7 +51,8 @@ public class GroupService {
 
     public void delete(String id, String userId) {
         Group group = lock(id);
-        if (!group.getOwner().getId().equals(userId) && user(userId).getRole() != User.Role.ADMIN) forbidden();
+        User actor = user(userId);
+        if (!group.getOwner().getId().equals(userId) && actor.getRole() != User.Role.ADMIN && actor.getRole() != User.Role.MODERATOR) forbidden();
         posts.deleteByGroupId(id);
         members.deleteByGroupId(id);
         groups.delete(group);

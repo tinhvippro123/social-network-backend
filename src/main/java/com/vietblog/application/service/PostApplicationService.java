@@ -46,6 +46,7 @@ public class PostApplicationService {
     private final ReactionRepository reactions;
     private final BookmarkRepository bookmarks;
     private final PostImageFeaturesRepository imageFeatures;
+    private final CoverImageIndexer coverImageIndexer;
     private final HtmlSanitizer htmlSanitizer;
 
     @Transactional
@@ -77,6 +78,9 @@ public class PostApplicationService {
                 .status(status)
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
+                .locationAddress(request.getLatitude() == null ? null : request.getLocationAddress())
+                .eventStartTime(request.getEventStartTime())
+                .eventEndTime(request.getEventEndTime())
                 .build();
 
         // Uỷ quyền cho Domain Service kiểm tra nghiệp vụ
@@ -84,6 +88,7 @@ public class PostApplicationService {
 
         // Lưu vào cơ sở hạ tầng
         Post savedPost = postRepository.save(post);
+        coverImageIndexer.scheduleAfterCommit(savedPost.getId());
         
         return PostResponse.fromEntity(savedPost);
     }
@@ -168,10 +173,14 @@ public class PostApplicationService {
         post.setStatus(status);
         post.setLatitude(request.getLatitude());
         post.setLongitude(request.getLongitude());
+        post.setLocationAddress(request.getLatitude() == null ? null : request.getLocationAddress());
+        post.setEventStartTime(request.getEventStartTime());
+        post.setEventEndTime(request.getEventEndTime());
 
         postDomainService.validatePostContent(post);
 
         Post updatedPost = postRepository.save(post);
+        coverImageIndexer.scheduleAfterCommit(updatedPost.getId());
         return PostResponse.fromEntity(updatedPost);
     }
 
@@ -183,7 +192,7 @@ public class PostApplicationService {
         // Kiểm tra quyền: tác giả hoặc quản trị viên (ADMIN) mới được xóa bài viết
         if (!post.getAuthor().getId().equals(userId)) {
             boolean isAdmin = userRepository.findById(userId)
-                    .map(u -> u.getRole() == User.Role.ADMIN)
+                    .map(u -> u.getRole() == User.Role.ADMIN || u.getRole() == User.Role.MODERATOR)
                     .orElse(false);
             if (!isAdmin) {
                 throw new ForbiddenException(ErrorCode.FORBIDDEN);
