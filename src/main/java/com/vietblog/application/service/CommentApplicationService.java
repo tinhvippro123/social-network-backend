@@ -66,14 +66,21 @@ public class CommentApplicationService {
         comment = commentRepository.save(comment);
         post.setCommentsCount(post.getCommentsCount() + 1);
         postDomainService.calculateTrendingScore(post);
-        if (!post.getAuthor().getId().equals(authorId)) {
-            String notifMsg = (parentComment == null)
-                    ? author.getName() + " đã bình luận về bài viết của bạn"
-                    : author.getName() + " đã trả lời bình luận của bạn";
+        if (parentComment != null && !parentComment.getAuthor().getId().equals(authorId)) {
+            notifications.save(Notification.builder()
+                    .user(parentComment.getAuthor())
+                    .type(Notification.NotificationType.COMMENT)
+                    .message(author.getName() + " đã trả lời bình luận của bạn")
+                    .avatar(author.getAvatar())
+                    .link("/posts/" + postId + "#comment-" + comment.getId())
+                    .build());
+        }
+        if (!post.getAuthor().getId().equals(authorId)
+                && (parentComment == null || !parentComment.getAuthor().getId().equals(post.getAuthor().getId()))) {
             notifications.save(Notification.builder()
                     .user(post.getAuthor())
                     .type(Notification.NotificationType.COMMENT)
-                    .message(notifMsg)
+                    .message(author.getName() + " đã bình luận về bài viết của bạn")
                     .avatar(author.getAvatar())
                     .link("/posts/" + postId + "#comment-" + comment.getId())
                     .build());
@@ -101,9 +108,17 @@ public class CommentApplicationService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.COMMENT_NOT_FOUND));
 
-        // Kiểm tra quyền: Chỉ tác giả comment mới được xóa
+        // Kiểm tra quyền: Tác giả comment, tác giả bài viết hoặc Admin/Moderator mới được xóa
         if (!comment.getAuthor().getId().equals(userId)) {
-            throw new ForbiddenException(ErrorCode.COMMENT_DELETE_FORBIDDEN);
+            boolean isPostOwner = comment.getPost() != null
+                    && comment.getPost().getAuthor() != null
+                    && comment.getPost().getAuthor().getId().equals(userId);
+            boolean isAdminOrMod = userRepository.findById(userId)
+                    .map(u -> u.getRole() == User.Role.ADMIN || u.getRole() == User.Role.MODERATOR)
+                    .orElse(false);
+            if (!isPostOwner && !isAdminOrMod) {
+                throw new ForbiddenException(ErrorCode.COMMENT_DELETE_FORBIDDEN);
+            }
         }
 
         Post post = postRepository.findLockedById(comment.getPost().getId())

@@ -90,8 +90,9 @@ public class ReportService {
         report.setResolvedBy(actor);
         report.setResolvedAt(LocalDateTime.now());
         reports.save(report);
+        String statusLabel = status == Report.ReportStatus.RESOLVED ? "Đã xử lý" : "Đã từ chối";
         notifications.save(Notification.builder().user(report.getReporter()).type(Notification.NotificationType.REPORT)
-                .message("Your report has been reviewed: " + status.name().toLowerCase(java.util.Locale.ROOT)).link("/notifications").build());
+                .message("Báo cáo của bạn đã được bộ phận kiểm duyệt xem xét: " + statusLabel).link("/notifications").build());
         return ReportDtos.Response.from(report);
     }
 

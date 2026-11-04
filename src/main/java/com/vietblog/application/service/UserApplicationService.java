@@ -4,11 +4,13 @@ import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.application.dto.user.UpdateProfileRequest;
 import com.vietblog.application.dto.user.UserProfileResponse;
 import com.vietblog.application.dto.user.UserSummaryResponse;
+import com.vietblog.domain.entity.Notification;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.DomainException;
 import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ResourceNotFoundException;
+import com.vietblog.infrastructure.repository.NotificationRepository;
 import com.vietblog.infrastructure.repository.PostRepository;
 import com.vietblog.infrastructure.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class UserApplicationService {
 
     private final UserRepository userRepository;
     private final PostRepository postRepository;
+    private final NotificationRepository notificationRepository;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getUserProfile(String targetUserId, String currentUserId) {
@@ -96,6 +99,13 @@ public class UserApplicationService {
 
             userRepository.save(targetUser);
             userRepository.save(currentUser);
+            notificationRepository.save(Notification.builder()
+                    .user(targetUser)
+                    .type(Notification.NotificationType.FOLLOW)
+                    .message(currentUser.getName() + " đã bắt đầu theo dõi bạn")
+                    .avatar(currentUser.getAvatar())
+                    .link("/profile/" + currentUser.getId())
+                    .build());
             return true;
         }
     }

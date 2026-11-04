@@ -136,9 +136,12 @@ public class GroupService {
 
     public void deletePost(String id, String postId, String userId) {
         lock(id);
-        GroupMember actor = member(id, userId);
+        User actorUser = user(userId);
+        boolean isSystemMod = actorUser.getRole() == User.Role.ADMIN || actorUser.getRole() == User.Role.MODERATOR;
+        GroupMember actor = members.findByGroupIdAndUserId(id, userId).orElse(null);
+        boolean isGroupManager = actor != null && actor.getRole() != GroupMember.Role.MEMBER;
         GroupPost post = findPost(id, postId);
-        if (!post.getAuthor().getId().equals(userId) && actor.getRole() == GroupMember.Role.MEMBER) forbidden();
+        if (!post.getAuthor().getId().equals(userId) && !isSystemMod && !isGroupManager) forbidden();
         postLikes.deleteByPostId(postId);
         postComments.deleteByPostId(postId);
         posts.delete(post);
@@ -182,8 +185,11 @@ public class GroupService {
         findPost(id, postId);
         GroupPostComment comment = postComments.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.COMMENT_NOT_FOUND));
-        GroupMember actor = member(id, userId);
-        if (!comment.getAuthor().getId().equals(userId) && actor.getRole() == GroupMember.Role.MEMBER) {
+        User actorUser = user(userId);
+        boolean isSystemMod = actorUser.getRole() == User.Role.ADMIN || actorUser.getRole() == User.Role.MODERATOR;
+        GroupMember actor = members.findByGroupIdAndUserId(id, userId).orElse(null);
+        boolean isGroupManager = actor != null && actor.getRole() != GroupMember.Role.MEMBER;
+        if (!comment.getAuthor().getId().equals(userId) && !isSystemMod && !isGroupManager) {
             forbidden();
         }
         postComments.delete(comment);
