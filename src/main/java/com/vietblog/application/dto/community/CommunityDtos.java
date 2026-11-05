@@ -12,7 +12,7 @@ public final class CommunityDtos {
     }
     public record GroupRequest(@NotBlank @Size(max = 120) String name,
                                @Size(max = 3000) String description,
-                               @Size(max = 255) String avatar, @Size(max = 255) String coverImage,
+                               @Size(max = 500) String avatar, @Size(max = 500) String coverImage,
                                @JsonProperty("isPublic") Boolean isPublic) {}
     public record GroupResponse(String id, String name, String description, String avatar, String coverImage,
                                 long membersCount, long postsCount, @JsonProperty("isJoined") boolean isJoined,
@@ -23,7 +23,7 @@ public final class CommunityDtos {
     public record RoleRequest(@NotNull GroupMember.Role role) {}
     public record GroupPostRequest(@NotBlank @Size(max = 255) String title,
                                    @NotBlank @Size(max = 100000) String content,
-                                   @Size(max = 1000) String excerpt, @Size(max = 255) String coverImage) {}
+                                   @Size(max = 1000) String excerpt, @Size(max = 500) String coverImage) {}
     public record GroupPostResponse(String id, String groupId, String title, String content, String excerpt,
                                     String coverImage, PublicUser author, LocalDateTime createdAt, LocalDateTime updatedAt,
                                     long likesCount, long commentsCount, @JsonProperty("isLiked") boolean isLiked) {

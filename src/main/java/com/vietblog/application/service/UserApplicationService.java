@@ -10,6 +10,7 @@ import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.DomainException;
 import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ResourceNotFoundException;
+import com.vietblog.infrastructure.repository.BookmarkRepository;
 import com.vietblog.infrastructure.repository.NotificationRepository;
 import com.vietblog.infrastructure.repository.PostRepository;
 import com.vietblog.infrastructure.repository.UserRepository;
@@ -30,13 +31,14 @@ public class UserApplicationService {
     private final UserRepository userRepository;
     private final PostRepository postRepository;
     private final NotificationRepository notificationRepository;
+    private final BookmarkRepository bookmarkRepository;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getUserProfile(String targetUserId, String currentUserId) {
         User targetUser = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
-        int postsCount = (int) postRepository.countByAuthorId(targetUserId);
+        int postsCount = (int) postRepository.countByAuthorIdAndStatus(targetUserId, Post.PostStatus.PUBLISHED);
         boolean isMe = currentUserId != null && currentUserId.equals(targetUserId);
         boolean isFollowing = (!isMe && currentUserId != null) && userRepository.isFollowing(targetUserId, currentUserId);
 
@@ -62,7 +64,7 @@ public class UserApplicationService {
         }
 
         userRepository.save(user);
-        int postsCount = (int) postRepository.countByAuthorId(currentUserId);
+        int postsCount = (int) postRepository.countByAuthorIdAndStatus(currentUserId, Post.PostStatus.PUBLISHED);
 
         return UserProfileResponse.fromEntity(user, false, true, postsCount);
     }
@@ -175,7 +177,11 @@ public class UserApplicationService {
 
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), limit, Sort.by("createdAt").descending());
         Page<Post> postPage = postRepository.findByAuthorIdAndStatus(targetUserId, postStatus, pageable);
+        int authorPostsCount = (int) postRepository.countByAuthorIdAndStatus(targetUserId, Post.PostStatus.PUBLISHED);
 
-        return postPage.map(PostResponse::fromEntity);
+        return postPage.map(post -> {
+            boolean isBookmarked = viewerId != null && bookmarkRepository.existsByUserIdAndPostId(viewerId, post.getId());
+            return PostResponse.fromEntity(post, authorPostsCount, isBookmarked);
+        });
     }
 }

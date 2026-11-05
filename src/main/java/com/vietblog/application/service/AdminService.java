@@ -12,6 +12,8 @@ import com.vietblog.infrastructure.repository.AdminUserRepository;
 import com.vietblog.infrastructure.repository.CommentRepository;
 import com.vietblog.infrastructure.repository.GroupRepository;
 import com.vietblog.infrastructure.repository.ReportRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,16 +35,16 @@ public class AdminService {
     private final CommentRepository comments;
     private final ReportRepository reports;
     private final GroupRepository groups;
+    private final PostApplicationService postApplicationService;
+
+    @PersistenceContext
+    private EntityManager em;
 
     @Transactional(readOnly = true)
     public AdminDtos.Stats stats() {
         return stats(7);
     }
 
-    /**
-     * Thống kê dashboard theo khoảng thời gian.
-     * 7/30 ngày: nhóm theo ngày; 90 ngày: theo tuần; 365 ngày: theo tháng (~30 ngày).
-     */
     @Transactional(readOnly = true)
     public AdminDtos.Stats stats(int days) {
         int range = Math.max(1, Math.min(days, 365));
@@ -153,6 +155,48 @@ public class AdminService {
         if (id.equals(actorId) || user.getRole() == User.Role.ADMIN) {
             throw new BusinessRuleException(ErrorCode.PROTECTED_ADMIN_ACCOUNT);
         }
+        User actor = users.findById(actorId).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+
+        // 1. Clear followers / following join table
+        user.getFollowers().forEach(f -> f.getFollowing().remove(user));
+        user.getFollowing().forEach(f -> f.getFollowers().remove(user));
+        user.getFollowers().clear();
+        user.getFollowing().clear();
+        users.saveAndFlush(user);
+
+        // 2. Delete tokens, blocks, notifications, reports
+        em.createQuery("DELETE FROM PasswordResetToken t WHERE t.user.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM ChatBlock b WHERE b.blocker.id = :uid OR b.blocked.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM Notification n WHERE n.user.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("UPDATE Report r SET r.resolvedBy = null WHERE r.resolvedBy.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM Report r WHERE r.reporter.id = :uid").setParameter("uid", id).executeUpdate();
+
+        // 3. Clean up chat messages & memberships
+        em.createQuery("UPDATE ChatMessage m SET m.replyTo = null WHERE m.replyTo.sender.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM ChatMessage m WHERE m.sender.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM ConversationMember cm WHERE cm.user.id = :uid").setParameter("uid", id).executeUpdate();
+
+        // 4. Clean up group interactions & reassign owned groups to actor
+        em.createQuery("DELETE FROM GroupPostLike l WHERE l.user.id = :uid OR l.post.author.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM GroupPostComment c WHERE c.author.id = :uid OR c.post.author.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM GroupPost p WHERE p.author.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM GroupMember gm WHERE gm.user.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("UPDATE Group g SET g.owner = :actor WHERE g.owner.id = :uid")
+                .setParameter("actor", actor).setParameter("uid", id).executeUpdate();
+
+        // 5. Clean up reactions, bookmarks, comments, and posts authored by user
+        em.createQuery("DELETE FROM Reaction r WHERE r.user.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM Bookmark b WHERE b.user.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("UPDATE Comment c SET c.parent = null WHERE c.parent.author.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM Comment c WHERE c.author.id = :uid").setParameter("uid", id).executeUpdate();
+
+        var authoredPostIds = em.createQuery("SELECT p.id FROM Post p WHERE p.author.id = :uid", String.class)
+                .setParameter("uid", id).getResultList();
+        for (String postId : authoredPostIds) {
+            postApplicationService.deletePost(postId, actorId);
+        }
+
+        em.flush();
         users.delete(user);
     }
 

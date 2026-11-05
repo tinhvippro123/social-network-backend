@@ -1,39 +1,36 @@
 package com.vietblog.application.service;
 
-import java.util.Comparator;
-import java.util.ArrayList;
-import org.springframework.data.domain.Pageable;
-import com.vietblog.infrastructure.repository.PostImageFeaturesRepository;
-import com.vietblog.infrastructure.repository.BookmarkRepository;
-import com.vietblog.infrastructure.repository.ReactionRepository;
-import com.vietblog.infrastructure.repository.CommentRepository;
-import com.vietblog.infrastructure.security.HtmlSanitizer;
 import com.vietblog.application.dto.post.CreatePostRequest;
 import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.domain.entity.Category;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.BusinessRuleException;
+import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
-import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.service.PostDomainService;
+import com.vietblog.infrastructure.repository.BookmarkRepository;
 import com.vietblog.infrastructure.repository.CategoryRepository;
+import com.vietblog.infrastructure.repository.CommentRepository;
+import com.vietblog.infrastructure.repository.PostImageFeaturesRepository;
 import com.vietblog.infrastructure.repository.PostRepository;
+import com.vietblog.infrastructure.repository.ReactionRepository;
 import com.vietblog.infrastructure.repository.UserRepository;
+import com.vietblog.infrastructure.security.HtmlSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Application Service: Điều phối (Orchestration).
- * Lấy data từ DB -> Đưa cho Domain Service xử lý (nếu có) -> Lưu lại DB.
- */
 @Service
 @RequiredArgsConstructor
 public class PostApplicationService {
@@ -53,7 +50,7 @@ public class PostApplicationService {
     public PostResponse createPost(String authorId, CreatePostRequest request) {
         User author = userRepository.findById(authorId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
-        
+
         Category category = categoryRepository.findBySlug(request.getCategoryId())
                 .or(() -> categoryRepository.findById(request.getCategoryId()))
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
@@ -83,14 +80,14 @@ public class PostApplicationService {
                 .eventEndTime(request.getEventEndTime())
                 .build();
 
-        // Uỷ quyền cho Domain Service kiểm tra nghiệp vụ
         postDomainService.validatePostContent(post);
+        postDomainService.calculateTrendingScore(post);
 
-        // Lưu vào cơ sở hạ tầng
         Post savedPost = postRepository.save(post);
+        syncCounters(author, category);
         coverImageIndexer.scheduleAfterCommit(savedPost.getId());
-        
-        return PostResponse.fromEntity(savedPost);
+
+        return mapPostResponse(savedPost, authorId);
     }
 
     @Transactional(readOnly = true)
@@ -109,7 +106,6 @@ public class PostApplicationService {
     @Transactional(readOnly = true)
     public List<PostResponse> getTrendingPosts(int limit, String viewerId) {
         validatePage(1, limit);
-        // Recalculate decay at read time so quiet posts cannot retain stale rankings.
         return postRepository.findByStatus(Post.PostStatus.PUBLISHED, Pageable.unpaged())
                 .stream().peek(postDomainService::calculateTrendingScore)
                 .sorted(Comparator.comparingDouble(Post::getTrendingScore).reversed().thenComparing(Post::getId))
@@ -117,7 +113,7 @@ public class PostApplicationService {
                 .map(post -> mapPostResponse(post, viewerId))
                 .collect(Collectors.toList());
     }
-    
+
     @Transactional
     public PostResponse getPostById(String id) {
         return getPostById(id, null);
@@ -127,18 +123,20 @@ public class PostApplicationService {
     public PostResponse getPostById(String id, String viewerId) {
         Post post = postRepository.findLockedById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
-        if (post.getStatus() != Post.PostStatus.PUBLISHED && !post.getAuthor().getId().equals(viewerId)) {
-            throw new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND);
+        if (post.getStatus() != Post.PostStatus.PUBLISHED) {
+            boolean isAuthor = viewerId != null && post.getAuthor() != null && post.getAuthor().getId().equals(viewerId);
+            boolean isAdminOrMod = viewerId != null && userRepository.findById(viewerId)
+                    .map(u -> u.getRole() == User.Role.ADMIN || u.getRole() == User.Role.MODERATOR)
+                    .orElse(false);
+            if (!isAuthor && !isAdminOrMod) {
+                throw new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND);
+            }
+        } else {
+            post.setViewsCount(post.getViewsCount() + 1);
+            postDomainService.calculateTrendingScore(post);
+            postRepository.save(post);
         }
-        
-        // Tăng view count
-        post.setViewsCount(post.getViewsCount() + 1);
-        
-        // Nhờ Domain tính lại điểm trending vì view tăng
-        postDomainService.calculateTrendingScore(post);
-        
-        postRepository.save(post);
-        
+
         return mapPostResponse(post, viewerId);
     }
 
@@ -147,7 +145,6 @@ public class PostApplicationService {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
 
-        // Kiểm tra quyền sở hữu: Chỉ tác giả mới được cập nhật bài viết
         if (!post.getAuthor().getId().equals(userId)) {
             throw new ForbiddenException(ErrorCode.FORBIDDEN);
         }
@@ -155,6 +152,7 @@ public class PostApplicationService {
             throw new ForbiddenException(ErrorCode.FORBIDDEN);
         }
 
+        Category oldCategory = post.getCategory();
         Category category = categoryRepository.findBySlug(request.getCategoryId())
                 .or(() -> categoryRepository.findById(request.getCategoryId()))
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.CATEGORY_NOT_FOUND));
@@ -182,8 +180,13 @@ public class PostApplicationService {
         post.setEventEndTime(request.getEventEndTime());
 
         postDomainService.validatePostContent(post);
+        postDomainService.calculateTrendingScore(post);
 
         Post updatedPost = postRepository.save(post);
+        syncCounters(post.getAuthor(), category);
+        if (oldCategory != null && !oldCategory.getId().equals(category.getId())) {
+            syncCategoryCounter(oldCategory);
+        }
         coverImageIndexer.scheduleAfterCommit(updatedPost.getId());
         return mapPostResponse(updatedPost, userId);
     }
@@ -193,7 +196,6 @@ public class PostApplicationService {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
 
-        // Kiểm tra quyền: tác giả hoặc quản trị viên (ADMIN) mới được xóa bài viết
         if (!post.getAuthor().getId().equals(userId)) {
             boolean isAdmin = userRepository.findById(userId)
                     .map(u -> u.getRole() == User.Role.ADMIN || u.getRole() == User.Role.MODERATOR)
@@ -203,27 +205,44 @@ public class PostApplicationService {
             }
         }
 
+        User author = post.getAuthor();
+        Category category = post.getCategory();
+
         imageFeatures.findById(id).ifPresent(imageFeatures::delete);
         comments.detachForPost(id);
         comments.deleteForPost(id);
         reactions.deleteForPost(id);
         bookmarks.deleteForPost(id);
         postRepository.delete(post);
+        postRepository.flush();
+
+        syncCounters(author, category);
     }
 
     @Transactional(readOnly = true)
     public Page<PostResponse> feed(int page, int limit, String category, String query) {
-        return feed(page, limit, category, query, null);
+        return feed(page, limit, category, query, null, "latest");
     }
 
     @Transactional(readOnly = true)
     public Page<PostResponse> feed(int page, int limit, String category, String query, String viewerId) {
+        return feed(page, limit, category, query, viewerId, "latest");
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PostResponse> feed(int page, int limit, String category, String query, String viewerId, String sort) {
         validatePage(page, limit);
         if (query != null && query.length() > 1000) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
 
         boolean hasCategory = category != null && !category.isBlank() && !"all".equalsIgnoreCase(category.trim());
         boolean hasQuery = query != null && !query.trim().isBlank();
-        PageRequest pageRequest = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+        Sort sortSpec = Sort.by(Sort.Direction.DESC, "createdAt", "id");
+        if ("trending".equalsIgnoreCase(sort)) {
+            sortSpec = Sort.by(Sort.Direction.DESC, "trendingScore", "viewsCount", "id");
+        } else if ("popular".equalsIgnoreCase(sort)) {
+            sortSpec = Sort.by(Sort.Direction.DESC, "viewsCount", "upvotesCount", "id");
+        }
+        PageRequest pageRequest = PageRequest.of(page - 1, limit, sortSpec);
 
         Page<Post> postPage;
         if (hasCategory && hasQuery) {
@@ -239,6 +258,23 @@ public class PostApplicationService {
         }
 
         return postPage.map(post -> mapPostResponse(post, viewerId));
+    }
+
+    private void syncCounters(User author, Category category) {
+        if (author != null) {
+            int authorCount = Math.toIntExact(postRepository.countByAuthorIdAndStatus(author.getId(), Post.PostStatus.PUBLISHED));
+            author.setPostsCount(authorCount);
+            userRepository.save(author);
+        }
+        syncCategoryCounter(category);
+    }
+
+    private void syncCategoryCounter(Category category) {
+        if (category != null) {
+            int catCount = Math.toIntExact(postRepository.countByCategoryIdAndStatus(category.getId(), Post.PostStatus.PUBLISHED));
+            category.setPostsCount(catCount);
+            categoryRepository.save(category);
+        }
     }
 
     private PostResponse mapPostResponse(Post post, String viewerId) {

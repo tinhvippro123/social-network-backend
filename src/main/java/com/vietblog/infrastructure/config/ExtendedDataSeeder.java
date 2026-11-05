@@ -194,6 +194,7 @@ public class ExtendedDataSeeder implements CommandLineRunner {
 
         postRepository.deleteAll();
         postRepository.flush();
+        userRepository.flush();
 
         passwordResetTokenRepository.deleteAllInBatch();
 
@@ -428,7 +429,15 @@ public class ExtendedDataSeeder implements CommandLineRunner {
             }
         }
 
+        for (Category category : categoryRepository.findAll()) {
+            int catPosts = Math.toIntExact(postRepository.countByCategoryIdAndStatus(category.getId(), Post.PostStatus.PUBLISHED));
+            category.setPostsCount(catPosts);
+            categoryRepository.save(category);
+        }
+
         postRepository.flush();
+        userRepository.flush();
+        categoryRepository.flush();
         commentRepository.flush();
         return new SeededPostsContext(postsByKey, targetCommentByPostKey);
     }
@@ -822,7 +831,15 @@ public class ExtendedDataSeeder implements CommandLineRunner {
             userRepository.save(user);
         }
 
+        for (Category category : categoryRepository.findAll()) {
+            int catPosts = Math.toIntExact(postRepository.countByCategoryIdAndStatus(category.getId(), Post.PostStatus.PUBLISHED));
+            category.setPostsCount(catPosts);
+            categoryRepository.save(category);
+        }
+
         postRepository.flush();
+        userRepository.flush();
+        categoryRepository.flush();
         userRepository.flush();
     }
 }

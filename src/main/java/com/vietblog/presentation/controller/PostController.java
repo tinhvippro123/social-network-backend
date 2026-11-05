@@ -24,7 +24,7 @@ public class PostController {
     public ResponseEntity<ApiResponse<PostResponse>> createPost(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @Valid @RequestBody CreatePostRequest request) {
-            
+
         PostResponse response = postApplicationService.createPost(currentUser.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(response, "Tạo bài viết thành công"));
     }
@@ -37,22 +37,28 @@ public class PostController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "latest") String sort,
             @AuthenticationPrincipal UserPrincipal currentUser) {
-            
+
         String viewerId = currentUser != null ? currentUser.getId() : null;
-        if ("trending".equalsIgnoreCase(sort)) {
+        boolean hasFilters = (category != null && !category.isBlank() && !"all".equalsIgnoreCase(category))
+                || (search != null && !search.isBlank());
+
+        if ("trending".equalsIgnoreCase(sort) && !hasFilters && page == 1) {
             List<PostResponse> trending = postApplicationService.getTrendingPosts(limit, viewerId);
-            return ResponseEntity.ok(ApiResponse.success(trending, "Lấy danh sách thịnh hành thành công"));
+            ApiResponse.Meta meta = new ApiResponse.Meta(1, limit, trending.size(), 1);
+            ApiResponse<List<PostResponse>> response = ApiResponse.success(trending, "Lấy danh sách thịnh hành thành công");
+            response.setMeta(meta);
+            return ResponseEntity.ok(response);
         }
 
-        Page<PostResponse> postPage = postApplicationService.feed(page, limit, category, search, viewerId);
-        
+        Page<PostResponse> postPage = postApplicationService.feed(page, limit, category, search, viewerId, sort);
+
         ApiResponse.Meta meta = new ApiResponse.Meta(page, limit, postPage.getTotalElements(), postPage.getTotalPages());
         ApiResponse<List<PostResponse>> response = ApiResponse.success(postPage.getContent(), "Lấy danh sách bài viết thành công");
         response.setMeta(meta);
-        
+
         return ResponseEntity.ok(response);
     }
-    
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<PostResponse>> getPostById(@PathVariable String id,
             @AuthenticationPrincipal UserPrincipal user) {

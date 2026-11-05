@@ -1,19 +1,28 @@
 package com.vietblog.application.service;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.application.dto.search.SummaryResponse;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.PostImageFeatures;
-import com.vietblog.domain.exception.*;
-import com.vietblog.domain.search.*;
-import com.vietblog.infrastructure.repository.*;
+import com.vietblog.domain.exception.BusinessRuleException;
+import com.vietblog.domain.exception.ErrorCode;
+import com.vietblog.domain.exception.ForbiddenException;
+import com.vietblog.domain.exception.ResourceNotFoundException;
+import com.vietblog.domain.search.GeoAlgorithms;
+import com.vietblog.domain.search.ImageAlgorithms;
+import com.vietblog.domain.search.TextAlgorithms;
+import com.vietblog.infrastructure.repository.BookmarkRepository;
+import com.vietblog.infrastructure.repository.PostImageFeaturesRepository;
+import com.vietblog.infrastructure.repository.SearchCommentRepository;
+import com.vietblog.infrastructure.repository.SearchPostRepository;
 import com.vietblog.infrastructure.search.SearchFileReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.util.*;
 import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
@@ -23,11 +32,11 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SearchApplicationService {
-    // A bounded reference implementation for the project corpus. See docs/search-api.md.
     public static final int MAX_CORPUS = 2000;
     private final SearchPostRepository posts;
     private final PostImageFeaturesRepository imageIndex;
     private final SearchCommentRepository comments;
+    private final BookmarkRepository bookmarks;
     private final SearchFileReader files;
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
@@ -49,13 +58,17 @@ public class SearchApplicationService {
     }
 
     public List<PostResponse> search(String query, String type, int limit) {
+        return search(query, type, limit, null);
+    }
+
+    public List<PostResponse> search(String query, String type, int limit, String viewerId) {
         validateLimit(limit);
         if (query == null || query.isBlank() || query.length() > 1000) throw invalid();
         if (!"keyword".equals(type) && !"semantic".equals(type)) throw invalid();
-        return textSearch(query, type, limit);
+        return textSearch(query, type, limit, viewerId);
     }
 
-    private List<PostResponse> textSearch(String query, String type, int limit) {
+    private List<PostResponse> textSearch(String query, String type, int limit, String viewerId) {
         List<Post> corpus = corpus();
         if (corpus.isEmpty()) return List.of();
         double[] scores;
@@ -68,15 +81,23 @@ public class SearchApplicationService {
         }
         return IntStream.range(0, corpus.size()).boxed().filter(i -> scores[i] > 0)
                 .sorted(Comparator.<Integer>comparingDouble(i -> scores[i]).reversed().thenComparingInt(i -> i)).limit(limit)
-                .map(i -> PostResponse.fromEntity(corpus.get(i))).toList();
+                .map(i -> toPostResponse(corpus.get(i), viewerId)).toList();
     }
 
     public List<PostResponse> searchDocument(MultipartFile document, int limit) {
+        return searchDocument(document, limit, null);
+    }
+
+    public List<PostResponse> searchDocument(MultipartFile document, int limit, String viewerId) {
         validateLimit(limit);
-        return textSearch(files.document(document), "semantic", limit);
+        return textSearch(files.document(document), "semantic", limit, viewerId);
     }
 
     public List<PostResponse> searchImage(MultipartFile image, int limit) {
+        return searchImage(image, limit, null);
+    }
+
+    public List<PostResponse> searchImage(MultipartFile image, int limit, String viewerId) {
         validateLimit(limit);
         double[] query = ImageAlgorithms.features(files.image(image));
         List<Post> corpus = corpus();
@@ -86,7 +107,7 @@ public class SearchApplicationService {
         imageIndex.findByPostIdIn(byId.keySet()).forEach(index -> scores.put(index.getPostId(), ImageAlgorithms.cosine(query, decode(index.getFeatures()))));
         return scores.entrySet().stream().filter(entry -> entry.getValue() > 0)
                 .sorted(Map.Entry.<String, Double>comparingByValue().reversed().thenComparing(Map.Entry::getKey)).limit(limit)
-                .map(entry -> PostResponse.fromEntity(byId.get(entry.getKey()))).toList();
+                .map(entry -> toPostResponse(byId.get(entry.getKey()), viewerId)).toList();
     }
 
     @Transactional
@@ -101,13 +122,24 @@ public class SearchApplicationService {
     }
 
     public List<PostResponse> nearby(double latitude, double longitude, double radiusKm, int limit) {
+        return nearby(latitude, longitude, radiusKm, limit, null);
+    }
+
+    public List<PostResponse> nearby(double latitude, double longitude, double radiusKm, int limit, String viewerId) {
         validateLimit(limit);
         if (!Double.isFinite(latitude) || !Double.isFinite(longitude) || !Double.isFinite(radiusKm)
                 || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || radiusKm <= 0 || radiusKm > 500) throw invalid();
         ToDoubleFunction<Post> distance = post -> GeoAlgorithms.distanceKm(latitude, longitude, post.getLatitude(), post.getLongitude());
         return corpus().stream().filter(post -> post.getLatitude() != null && post.getLongitude() != null)
                 .filter(post -> distance.applyAsDouble(post) <= radiusKm)
-                .sorted(Comparator.comparingDouble(distance).thenComparing(Post::getId)).limit(limit).map(PostResponse::fromEntity).toList();
+                .sorted(Comparator.comparingDouble(distance).thenComparing(Post::getId)).limit(limit)
+                .map(post -> toPostResponse(post, viewerId)).toList();
+    }
+
+    private PostResponse toPostResponse(Post post, String viewerId) {
+        int authorPostsCount = post.getAuthor() != null ? post.getAuthor().getPostsCount() : 0;
+        boolean isBookmarked = viewerId != null && bookmarks.existsByUserIdAndPostId(viewerId, post.getId());
+        return PostResponse.fromEntity(post, authorPostsCount, isBookmarked);
     }
 
     public SummaryResponse summary(String postId, int sentences) {

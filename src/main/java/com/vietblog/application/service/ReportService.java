@@ -14,9 +14,10 @@ import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.infrastructure.repository.AdminPostRepository;
 import com.vietblog.infrastructure.repository.AdminUserRepository;
 import com.vietblog.infrastructure.repository.CommentRepository;
-import com.vietblog.infrastructure.repository.ReportRepository;
-import com.vietblog.infrastructure.repository.GroupRepository;
 import com.vietblog.infrastructure.repository.GroupMemberRepository;
+import com.vietblog.infrastructure.repository.GroupRepository;
+import com.vietblog.infrastructure.repository.NotificationRepository;
+import com.vietblog.infrastructure.repository.ReportRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,14 +33,13 @@ public class ReportService {
     private final AdminUserRepository users;
     private final AdminPostRepository posts;
     private final CommentRepository comments;
-    private final com.vietblog.infrastructure.repository.NotificationRepository notifications;
+    private final NotificationRepository notifications;
     private final GroupRepository groups;
     private final GroupMemberRepository groupMembers;
     private final GroupService groupService;
 
     @Transactional
     public ReportDtos.Response create(String userId, ReportDtos.CreateRequest request) {
-        // Serialize submissions by one reporter so simultaneous duplicate requests cannot create two pending reports.
         User reporter = users.findLockedById(userId).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
         String title = targetTitle(request.type(), request.targetId(), userId);
         if (reports.existsByReporterIdAndTargetIdAndTypeAndStatus(userId, request.targetId(), request.type(), Report.ReportStatus.PENDING)) {
@@ -67,7 +67,15 @@ public class ReportService {
             case DELETE -> removeTarget(report, actor);
             case BAN -> banTarget(report, actor);
         }
-        return finish(report, actor, Report.ReportStatus.RESOLVED, action.name());
+        ReportDtos.Response res = finish(report, actor, Report.ReportStatus.RESOLVED, action.name());
+        if (action == ReportDtos.Action.DELETE || action == ReportDtos.Action.BAN) {
+            for (Report dup : reports.findByTypeAndTargetIdAndStatus(report.getType(), report.getTargetId(), Report.ReportStatus.PENDING)) {
+                if (!dup.getId().equals(report.getId())) {
+                    finish(dup, actor, Report.ReportStatus.RESOLVED, action.name());
+                }
+            }
+        }
+        return res;
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
@@ -145,35 +153,39 @@ public class ReportService {
 
     private void removeTarget(Report report, User actor) {
         switch (report.getType()) {
-            case POST -> {
-                Post post = post(report.getTargetId());
+            case POST -> posts.findById(report.getTargetId()).ifPresent(post -> {
                 post.setStatus(Post.PostStatus.HIDDEN);
                 posts.save(post);
-            }
-            case COMMENT -> {
-                Comment comment = comment(report.getTargetId());
+            });
+            case COMMENT -> comments.findById(report.getTargetId()).ifPresent(comment -> {
                 Post post = comment.getPost();
                 comments.delete(comment);
                 comments.flush();
-                post.setCommentsCount(Math.toIntExact(comments.countByPostId(post.getId())));
-                posts.save(post);
-            }
+                if (post != null) {
+                    post.setCommentsCount(Math.toIntExact(comments.countByPostId(post.getId())));
+                    posts.save(post);
+                }
+            });
             case GROUP -> {
                 if (actor.getRole() != User.Role.ADMIN) throw new ForbiddenException(ErrorCode.FORBIDDEN);
-                groupService.delete(report.getTargetId(), actor.getId());
+                if (groups.existsById(report.getTargetId())) {
+                    groupService.delete(report.getTargetId(), actor.getId());
+                }
             }
-            case USER -> throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+            case USER -> banTarget(report, actor);
         }
     }
 
     private void banTarget(Report report, User actor) {
         String targetUserId = switch (report.getType()) {
-            case POST -> post(report.getTargetId()).getAuthor().getId();
-            case COMMENT -> comment(report.getTargetId()).getAuthor().getId();
+            case POST -> posts.findById(report.getTargetId()).map(p -> p.getAuthor().getId()).orElse(null);
+            case COMMENT -> comments.findById(report.getTargetId()).map(c -> c.getAuthor().getId()).orElse(null);
             case USER -> report.getTargetId();
-            case GROUP -> group(report.getTargetId()).getOwner().getId();
+            case GROUP -> groups.findById(report.getTargetId()).map(g -> g.getOwner().getId()).orElse(null);
         };
-        User target = users.findLockedById(targetUserId).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+        if (targetUserId == null) return;
+        User target = users.findLockedById(targetUserId).orElse(null);
+        if (target == null) return;
         if (target.getId().equals(actor.getId()) || target.getRole() == User.Role.ADMIN
                 || (actor.getRole() == User.Role.MODERATOR && target.getRole() != User.Role.USER)) {
             throw new ForbiddenException(ErrorCode.PROTECTED_ADMIN_ACCOUNT);

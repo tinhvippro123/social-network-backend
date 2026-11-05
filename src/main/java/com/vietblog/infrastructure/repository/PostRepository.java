@@ -45,4 +45,10 @@ public interface PostRepository extends JpaRepository<Post, String> {
     Page<Post> searchByKeyword(@Param("query") String query, Pageable pageable);
 
     long countByAuthorId(String authorId);
+
+    long countByAuthorIdAndStatus(String authorId, Post.PostStatus status);
+
+    long countByCategoryId(String categoryId);
+
+    long countByCategoryIdAndStatus(String categoryId, Post.PostStatus status);
 }

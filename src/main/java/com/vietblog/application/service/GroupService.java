@@ -40,7 +40,7 @@ public class GroupService {
 
     public GroupResponse update(String id, String userId, GroupRequest request) {
         Group group = lock(id);
-        requireManager(id, userId);
+        requireManagerOrSystemMod(id, userId);
         group.setName(request.name().trim());
         group.setDescription(request.description());
         group.setAvatar(request.avatar());
@@ -53,6 +53,8 @@ public class GroupService {
         Group group = lock(id);
         User actor = user(userId);
         if (!group.getOwner().getId().equals(userId) && actor.getRole() != User.Role.ADMIN && actor.getRole() != User.Role.MODERATOR) forbidden();
+        postLikes.deleteByGroupId(id);
+        postComments.deleteByGroupId(id);
         posts.deleteByGroupId(id);
         members.deleteByGroupId(id);
         groups.delete(group);
@@ -68,7 +70,7 @@ public class GroupService {
 
     public void addMember(String id, String actorId, String userId) {
         Group group = lock(id);
-        requireManager(id, actorId);
+        requireManagerOrSystemMod(id, actorId);
         if (!members.existsByGroupIdAndUserId(id, userId)) {
             members.save(GroupMember.builder().group(group).user(user(userId)).build());
         }
@@ -79,15 +81,17 @@ public class GroupService {
         GroupMember target = member(id, userId);
         if (target.getRole() == GroupMember.Role.OWNER) invalid();
         if (!actorId.equals(userId)) {
-            GroupMember actor = requireManager(id, actorId);
-            if (target.getRole() == GroupMember.Role.ADMIN && actor.getRole() != GroupMember.Role.OWNER) forbidden();
+            if (!isSystemMod(actorId)) {
+                GroupMember actor = requireManager(id, actorId);
+                if (target.getRole() == GroupMember.Role.ADMIN && actor.getRole() != GroupMember.Role.OWNER) forbidden();
+            }
         }
         members.delete(target);
     }
 
     public void setRole(String id, String actorId, String userId, GroupMember.Role role) {
         Group group = lock(id);
-        if (!group.getOwner().getId().equals(actorId)) forbidden();
+        if (!group.getOwner().getId().equals(actorId) && !isSystemMod(actorId)) forbidden();
         GroupMember target = member(id, userId);
         if (target.getRole() == GroupMember.Role.OWNER || role == GroupMember.Role.OWNER) invalid();
         target.setRole(role);
@@ -123,9 +127,8 @@ public class GroupService {
 
     public GroupPostResponse updatePost(String id, String postId, String userId, GroupPostRequest request) {
         lock(id);
-        member(id, userId);
         GroupPost post = findPost(id, postId);
-        if (!post.getAuthor().getId().equals(userId)) forbidden();
+        if (!post.getAuthor().getId().equals(userId) && !isSystemMod(userId)) forbidden();
         post.setTitle(request.title().trim());
         post.setContent(htmlSanitizer.sanitize(request.content()));
         post.setExcerpt(request.excerpt());
@@ -136,12 +139,11 @@ public class GroupService {
 
     public void deletePost(String id, String postId, String userId) {
         lock(id);
-        User actorUser = user(userId);
-        boolean isSystemMod = actorUser.getRole() == User.Role.ADMIN || actorUser.getRole() == User.Role.MODERATOR;
+        boolean sysMod = isSystemMod(userId);
         GroupMember actor = members.findByGroupIdAndUserId(id, userId).orElse(null);
         boolean isGroupManager = actor != null && actor.getRole() != GroupMember.Role.MEMBER;
         GroupPost post = findPost(id, postId);
-        if (!post.getAuthor().getId().equals(userId) && !isSystemMod && !isGroupManager) forbidden();
+        if (!post.getAuthor().getId().equals(userId) && !sysMod && !isGroupManager) forbidden();
         postLikes.deleteByPostId(postId);
         postComments.deleteByPostId(postId);
         posts.delete(post);
@@ -182,14 +184,16 @@ public class GroupService {
 
     public void deleteComment(String id, String postId, String commentId, String userId) {
         lock(id);
-        findPost(id, postId);
+        GroupPost post = findPost(id, postId);
         GroupPostComment comment = postComments.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.COMMENT_NOT_FOUND));
-        User actorUser = user(userId);
-        boolean isSystemMod = actorUser.getRole() == User.Role.ADMIN || actorUser.getRole() == User.Role.MODERATOR;
+        if (!comment.getPost().getId().equals(post.getId())) {
+            throw new ResourceNotFoundException(ErrorCode.COMMENT_NOT_FOUND);
+        }
+        boolean sysMod = isSystemMod(userId);
         GroupMember actor = members.findByGroupIdAndUserId(id, userId).orElse(null);
         boolean isGroupManager = actor != null && actor.getRole() != GroupMember.Role.MEMBER;
-        if (!comment.getAuthor().getId().equals(userId) && !isSystemMod && !isGroupManager) {
+        if (!comment.getAuthor().getId().equals(userId) && !sysMod && !isGroupManager) {
             forbidden();
         }
         postComments.delete(comment);
@@ -221,8 +225,18 @@ public class GroupService {
         if (membership.getRole() != GroupMember.Role.OWNER && membership.getRole() != GroupMember.Role.ADMIN) forbidden();
         return membership;
     }
+    private void requireManagerOrSystemMod(String id, String userId) {
+        if (isSystemMod(userId)) return;
+        requireManager(id, userId);
+    }
+    private boolean isSystemMod(String userId) {
+        if (userId == null) return false;
+        return users.findById(userId)
+                .map(u -> u.isActive() && (u.getRole() == User.Role.ADMIN || u.getRole() == User.Role.MODERATOR))
+                .orElse(false);
+    }
     private void requireReadable(Group group, String userId) {
-        if (!group.isPublicGroup() && !members.existsByGroupIdAndUserId(group.getId(), userId)) forbidden();
+        if (!group.isPublicGroup() && !members.existsByGroupIdAndUserId(group.getId(), userId) && !isSystemMod(userId)) forbidden();
     }
     private User user(String id) {
         User user = users.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));

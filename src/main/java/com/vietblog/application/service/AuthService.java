@@ -25,8 +25,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -44,15 +44,17 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final ObjectMapper objectMapper;
 
+    @Transactional
     public JwtAuthenticationResponse login(LoginRequest request) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword())
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = tokenProvider.generateToken(authentication);
 
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
@@ -60,22 +62,30 @@ public class AuthService {
         return new JwtAuthenticationResponse(jwt, JwtAuthenticationResponse.UserDto.fromEntity(user));
     }
 
+    @Transactional
     public void register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        if (request.getPasswordConfirm() != null && !request.getPasswordConfirm().isBlank()
+                && !request.getPassword().equals(request.getPasswordConfirm())) {
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Mật khẩu xác nhận không khớp");
+        }
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw new BusinessRuleException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
         User user = User.builder()
-                .name(request.getName())
-                .email(request.getEmail())
+                .name(request.getName().trim())
+                .email(normalizedEmail)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .build();
 
         userRepository.save(user);
     }
 
+    @Transactional
     public void changePassword(String email, String currentPassword, String newPassword) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email.trim().toLowerCase())
+                .or(() -> userRepository.findByEmail(email))
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
@@ -88,7 +98,9 @@ public class AuthService {
 
     @Transactional
     public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        User user = userRepository.findByEmail(normalizedEmail)
+                .or(() -> userRepository.findByEmail(request.getEmail().trim()))
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
         String resetToken = UUID.randomUUID().toString();
@@ -142,6 +154,7 @@ public class AuthService {
         log.info("[PASSWORD_RESET] Password successfully reset for user id={}, email={}", user.getId(), user.getEmail());
     }
 
+    @Transactional(readOnly = true)
     public JwtAuthenticationResponse refreshToken(String token) {
         if (!tokenProvider.validateToken(token)) {
             throw new BusinessRuleException(ErrorCode.UNAUTHORIZED);
