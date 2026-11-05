@@ -155,6 +155,11 @@ public class ChatService {
         } else blocks.deleteByBlockerIdAndBlockedId(actorId, targetId);
     }
 
+    @Transactional(readOnly = true)
+    public List<PublicUser> blockedUsers(String actorId) {
+        return blocks.findByBlockerId(actorId).stream().map(b -> PublicUser.from(b.getBlocked())).toList();
+    }
+
     public MessageResponse revoke(String id, String messageId, String userId) {
         lock(id);
         member(id, userId);

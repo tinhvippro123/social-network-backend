@@ -54,6 +54,10 @@ public class ChatController {
     public ApiResponse<Void> hide(@PathVariable String id, @AuthenticationPrincipal UserPrincipal user) {
         service.preference(id, user.getId(), "hide", true); return ok(null);
     }
+    @GetMapping("/blocks")
+    public ApiResponse<List<com.vietblog.application.dto.community.CommunityDtos.PublicUser>> blockedUsers(@AuthenticationPrincipal UserPrincipal user) {
+        return ok(service.blockedUsers(user.getId()));
+    }
     @PostMapping("/blocks/{userId}")
     public ApiResponse<Void> block(@PathVariable String userId, @AuthenticationPrincipal UserPrincipal user) {
         service.block(user.getId(), userId, true); return ok(null);

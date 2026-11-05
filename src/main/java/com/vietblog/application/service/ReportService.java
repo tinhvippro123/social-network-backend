@@ -47,14 +47,14 @@ public class ReportService {
         }
         Report report = Report.builder().reporter(reporter).targetId(request.targetId()).type(request.type())
                 .targetTitle(title).reason(request.reason().trim()).description(request.description()).build();
-        return ReportDtos.Response.from(reports.save(report));
+        return toResponse(reports.save(report));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     @Transactional(readOnly = true)
     public Page<ReportDtos.Response> list(Report.ReportStatus status, int page, int limit) {
         var pageable = AdminService.page(page, limit, "createdAt");
-        return (status == null ? reports.findAll(pageable) : reports.findByStatus(status, pageable)).map(ReportDtos.Response::from);
+        return (status == null ? reports.findAll(pageable) : reports.findByStatus(status, pageable)).map(this::toResponse);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
@@ -93,7 +93,17 @@ public class ReportService {
         String statusLabel = status == Report.ReportStatus.RESOLVED ? "Đã xử lý" : "Đã từ chối";
         notifications.save(Notification.builder().user(report.getReporter()).type(Notification.NotificationType.REPORT)
                 .message("Báo cáo của bạn đã được bộ phận kiểm duyệt xem xét: " + statusLabel).link("/notifications").build());
-        return ReportDtos.Response.from(report);
+        return toResponse(report);
+    }
+
+    private ReportDtos.Response toResponse(Report report) {
+        String targetPostId = null;
+        if (report.getType() == Report.TargetType.POST) {
+            targetPostId = report.getTargetId();
+        } else if (report.getType() == Report.TargetType.COMMENT) {
+            targetPostId = comments.findById(report.getTargetId()).map(c -> c.getPost().getId()).orElse(null);
+        }
+        return ReportDtos.Response.from(report, targetPostId);
     }
 
     private String targetTitle(Report.TargetType type, String id, String userId) {
