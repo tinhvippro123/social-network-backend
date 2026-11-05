@@ -822,7 +822,7 @@ public class ExtendedDataSeeder implements CommandLineRunner {
         }
 
         for (User user : userRepository.findAll()) {
-            int postsCount = Math.toIntExact(postRepository.countByAuthorId(user.getId()));
+            int postsCount = Math.toIntExact(postRepository.countByAuthorIdAndStatus(user.getId(), Post.PostStatus.PUBLISHED));
             int followersCount = userRepository.findFollowersByUserId(user.getId()).size();
             int followingCount = userRepository.findFollowingByUserId(user.getId()).size();
             user.setPostsCount(postsCount);

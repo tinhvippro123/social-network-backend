@@ -7,6 +7,7 @@ import com.vietblog.application.dto.user.UserSummaryResponse;
 import com.vietblog.domain.entity.Notification;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
+import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.DomainException;
 import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ResourceNotFoundException;
@@ -55,7 +56,11 @@ public class UserApplicationService {
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
-        user.setName(request.getName().trim());
+        String trimmedName = request.getName() == null ? "" : request.getName().trim();
+        if (trimmedName.length() < 2) {
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Tên hiển thị phải từ 2 đến 50 ký tự");
+        }
+        user.setName(trimmedName);
         if (request.getBio() != null) {
             user.setBio(request.getBio().trim());
         }
@@ -122,7 +127,8 @@ public class UserApplicationService {
         return followers.stream()
                 .map(u -> {
                     boolean isFollowing = currentUserId != null && userRepository.isFollowing(u.getId(), currentUserId);
-                    int postsCount = Math.max(u.getPostsCount(), (int) postRepository.countByAuthorId(u.getId()));
+                    int postsCount = Math.max(u.getPostsCount(),
+                            (int) postRepository.countByAuthorIdAndStatus(u.getId(), Post.PostStatus.PUBLISHED));
                     return UserSummaryResponse.fromEntity(u, isFollowing, postsCount);
                 })
                 .toList();
@@ -138,7 +144,8 @@ public class UserApplicationService {
         return following.stream()
                 .map(u -> {
                     boolean isFollowing = currentUserId != null && userRepository.isFollowing(u.getId(), currentUserId);
-                    int postsCount = Math.max(u.getPostsCount(), (int) postRepository.countByAuthorId(u.getId()));
+                    int postsCount = Math.max(u.getPostsCount(),
+                            (int) postRepository.countByAuthorIdAndStatus(u.getId(), Post.PostStatus.PUBLISHED));
                     return UserSummaryResponse.fromEntity(u, isFollowing, postsCount);
                 })
                 .toList();
@@ -146,14 +153,19 @@ public class UserApplicationService {
 
     @Transactional(readOnly = true)
     public List<UserSummaryResponse> getRecommendedUsers(String currentUserId, int limit) {
-        Pageable pageable = PageRequest.of(0, limit);
+        if (limit < 1 || limit > 100) {
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        }
+        Pageable pageable = PageRequest.of(0, limit + 1);
         List<User> topUsers = userRepository.findTopUsers(pageable);
 
         return topUsers.stream()
                 .filter(u -> currentUserId == null || !u.getId().equals(currentUserId))
+                .limit(limit)
                 .map(u -> {
                     boolean isFollowing = currentUserId != null && userRepository.isFollowing(u.getId(), currentUserId);
-                    int postsCount = Math.max(u.getPostsCount(), (int) postRepository.countByAuthorId(u.getId()));
+                    int postsCount = Math.max(u.getPostsCount(),
+                            (int) postRepository.countByAuthorIdAndStatus(u.getId(), Post.PostStatus.PUBLISHED));
                     return UserSummaryResponse.fromEntity(u, isFollowing, postsCount);
                 })
                 .toList();
@@ -166,16 +178,23 @@ public class UserApplicationService {
 
     @Transactional(readOnly = true)
     public Page<PostResponse> getUserPosts(String targetUserId, int page, int limit, String status, String viewerId) {
+        if (page < 1 || limit < 1 || limit > 100) {
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        }
         if (!userRepository.existsById(targetUserId)) {
             throw new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND);
         }
 
+        Pageable pageable = PageRequest.of(page - 1, limit, Sort.by("createdAt").descending());
         Post.PostStatus postStatus = Post.PostStatus.PUBLISHED;
-        if ("DRAFT".equalsIgnoreCase(status) && viewerId != null && viewerId.equals(targetUserId)) {
-            postStatus = Post.PostStatus.DRAFT;
+        if ("DRAFT".equalsIgnoreCase(status)) {
+            if (viewerId != null && viewerId.equals(targetUserId)) {
+                postStatus = Post.PostStatus.DRAFT;
+            } else {
+                return Page.empty(pageable);
+            }
         }
 
-        Pageable pageable = PageRequest.of(Math.max(0, page - 1), limit, Sort.by("createdAt").descending());
         Page<Post> postPage = postRepository.findByAuthorIdAndStatus(targetUserId, postStatus, pageable);
         int authorPostsCount = (int) postRepository.countByAuthorIdAndStatus(targetUserId, Post.PostStatus.PUBLISHED);
 

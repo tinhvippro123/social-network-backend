@@ -103,7 +103,9 @@ public class ReactionService {
         for (Object[] result : results) {
             String emoji = (String) result[0];
             Long count = (Long) result[1];
-            summary.put(emoji, count);
+            if (!"UPVOTE".equals(emoji) && !"DOWNVOTE".equals(emoji)) {
+                summary.put(emoji, count);
+            }
         }
         return summary;
     }

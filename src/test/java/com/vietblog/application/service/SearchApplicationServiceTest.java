@@ -16,8 +16,9 @@ class SearchApplicationServiceTest {
     private final SearchPostRepository posts = mock(SearchPostRepository.class);
     private final PostImageFeaturesRepository images = mock(PostImageFeaturesRepository.class);
     private final SearchCommentRepository comments = mock(SearchCommentRepository.class);
+    private final BookmarkRepository bookmarks = mock(BookmarkRepository.class);
     private final SearchFileReader files = mock(SearchFileReader.class);
-    private final SearchApplicationService service = new SearchApplicationService(posts, images, comments, files);
+    private final SearchApplicationService service = new SearchApplicationService(posts, images, comments, bookmarks, files);
     private Post post;
 
     @BeforeEach void setUp() {

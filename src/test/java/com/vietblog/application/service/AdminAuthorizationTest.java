@@ -60,9 +60,10 @@ class AdminAuthorizationTest {
         @Bean CommentRepository comments() { return mock(CommentRepository.class); }
         @Bean ReportRepository reports() { return mock(ReportRepository.class); }
         @Bean GroupRepository groups() { return mock(GroupRepository.class); }
+        @Bean PostApplicationService postApplicationService() { return mock(PostApplicationService.class); }
         @Bean AdminService admin(AdminUserRepository users, AdminPostRepository posts, CommentRepository comments,
-                                 ReportRepository reports, GroupRepository groups) {
-            return new AdminService(users, posts, comments, reports, groups);
+                                 ReportRepository reports, GroupRepository groups, PostApplicationService postApplicationService) {
+            return new AdminService(users, posts, comments, reports, groups, postApplicationService);
         }
     }
 }

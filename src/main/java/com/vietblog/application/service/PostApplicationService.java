@@ -9,6 +9,7 @@ import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
+import com.vietblog.domain.search.TextAlgorithms;
 import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.infrastructure.repository.BookmarkRepository;
 import com.vietblog.infrastructure.repository.CategoryRepository;
@@ -29,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -64,14 +66,17 @@ public class PostApplicationService {
             }
         }
 
+        String sanitizedContent = htmlSanitizer.sanitize(request.getContent());
+        String resolvedExcerpt = resolveExcerpt(request.getExcerpt(), sanitizedContent);
+
         Post post = Post.builder()
-                .title(request.getTitle())
-                .content(htmlSanitizer.sanitize(request.getContent()))
-                .excerpt(request.getExcerpt())
+                .title(request.getTitle().trim())
+                .content(sanitizedContent)
+                .excerpt(resolvedExcerpt)
                 .coverImage(request.getCoverImage())
                 .author(author)
                 .category(category)
-                .tags(request.getTags() == null ? new ArrayList<>() : request.getTags())
+                .tags(sanitizeTags(request.getTags()))
                 .status(status)
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
@@ -84,7 +89,7 @@ public class PostApplicationService {
         postDomainService.calculateTrendingScore(post);
 
         Post savedPost = postRepository.save(post);
-        syncCounters(author, category);
+        syncAuthorAndCategoryCounters(author, category);
         coverImageIndexer.scheduleAfterCommit(savedPost.getId());
 
         return mapPostResponse(savedPost, authorId);
@@ -166,12 +171,15 @@ public class PostApplicationService {
             }
         }
 
-        post.setTitle(request.getTitle());
-        post.setContent(htmlSanitizer.sanitize(request.getContent()));
-        post.setExcerpt(request.getExcerpt());
+        String sanitizedContent = htmlSanitizer.sanitize(request.getContent());
+        String resolvedExcerpt = resolveExcerpt(request.getExcerpt(), sanitizedContent);
+
+        post.setTitle(request.getTitle().trim());
+        post.setContent(sanitizedContent);
+        post.setExcerpt(resolvedExcerpt);
         post.setCoverImage(request.getCoverImage());
         post.setCategory(category);
-        post.setTags(request.getTags() == null ? new ArrayList<>() : request.getTags());
+        post.setTags(sanitizeTags(request.getTags()));
         post.setStatus(status);
         post.setLatitude(request.getLatitude());
         post.setLongitude(request.getLongitude());
@@ -183,7 +191,7 @@ public class PostApplicationService {
         postDomainService.calculateTrendingScore(post);
 
         Post updatedPost = postRepository.save(post);
-        syncCounters(post.getAuthor(), category);
+        syncAuthorAndCategoryCounters(post.getAuthor(), category);
         if (oldCategory != null && !oldCategory.getId().equals(category.getId())) {
             syncCategoryCounter(oldCategory);
         }
@@ -216,7 +224,7 @@ public class PostApplicationService {
         postRepository.delete(post);
         postRepository.flush();
 
-        syncCounters(author, category);
+        syncAuthorAndCategoryCounters(author, category);
     }
 
     @Transactional(readOnly = true)
@@ -260,7 +268,7 @@ public class PostApplicationService {
         return postPage.map(post -> mapPostResponse(post, viewerId));
     }
 
-    private void syncCounters(User author, Category category) {
+    public void syncAuthorAndCategoryCounters(User author, Category category) {
         if (author != null) {
             int authorCount = Math.toIntExact(postRepository.countByAuthorIdAndStatus(author.getId(), Post.PostStatus.PUBLISHED));
             author.setPostsCount(authorCount);
@@ -277,9 +285,30 @@ public class PostApplicationService {
         }
     }
 
+    private static List<String> sanitizeTags(List<String> tags) {
+        if (tags == null) return new ArrayList<>();
+        return tags.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(t -> !t.isEmpty())
+                .distinct()
+                .limit(10)
+                .collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    private static String resolveExcerpt(String excerpt, String sanitizedContent) {
+        if (excerpt != null && !excerpt.isBlank()) {
+            return excerpt.trim();
+        }
+        String plain = TextAlgorithms.plainText(sanitizedContent == null ? "" : sanitizedContent).trim();
+        if (plain.isEmpty()) return "";
+        return plain.length() <= 200 ? plain : plain.substring(0, 197) + "...";
+    }
+
     private PostResponse mapPostResponse(Post post, String viewerId) {
         int authorPostsCount = post.getAuthor() != null
-                ? Math.max(post.getAuthor().getPostsCount(), (int) postRepository.countByAuthorId(post.getAuthor().getId()))
+                ? Math.max(post.getAuthor().getPostsCount(),
+                        (int) postRepository.countByAuthorIdAndStatus(post.getAuthor().getId(), Post.PostStatus.PUBLISHED))
                 : 0;
         boolean isBookmarked = viewerId != null && bookmarks.existsByUserIdAndPostId(viewerId, post.getId());
         return PostResponse.fromEntity(post, authorPostsCount, isBookmarked);

@@ -39,17 +39,6 @@ public class PostController {
             @AuthenticationPrincipal UserPrincipal currentUser) {
 
         String viewerId = currentUser != null ? currentUser.getId() : null;
-        boolean hasFilters = (category != null && !category.isBlank() && !"all".equalsIgnoreCase(category))
-                || (search != null && !search.isBlank());
-
-        if ("trending".equalsIgnoreCase(sort) && !hasFilters && page == 1) {
-            List<PostResponse> trending = postApplicationService.getTrendingPosts(limit, viewerId);
-            ApiResponse.Meta meta = new ApiResponse.Meta(1, limit, trending.size(), 1);
-            ApiResponse<List<PostResponse>> response = ApiResponse.success(trending, "Lấy danh sách thịnh hành thành công");
-            response.setMeta(meta);
-            return ResponseEntity.ok(response);
-        }
-
         Page<PostResponse> postPage = postApplicationService.feed(page, limit, category, search, viewerId, sort);
 
         ApiResponse.Meta meta = new ApiResponse.Meta(page, limit, postPage.getTotalElements(), postPage.getTotalPages());

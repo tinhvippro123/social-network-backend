@@ -5,6 +5,7 @@ import com.vietblog.domain.entity.PasswordResetToken;
 import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ErrorCode;
+import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.infrastructure.repository.PasswordResetTokenRepository;
 import com.vietblog.infrastructure.repository.UserRepository;
@@ -103,6 +104,11 @@ public class AuthService {
                 .or(() -> userRepository.findByEmail(request.getEmail().trim()))
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
+        for (PasswordResetToken existing : resetTokenRepository.findByUserAndUsedFalse(user)) {
+            existing.setUsed(true);
+            resetTokenRepository.save(existing);
+        }
+
         String resetToken = UUID.randomUUID().toString();
         String otp = String.format("%06d", new SecureRandom().nextInt(1_000_000));
         LocalDateTime expiryDate = LocalDateTime.now().plusMinutes(15);
@@ -134,7 +140,7 @@ public class AuthService {
 
         Optional<PasswordResetToken> tokenOpt = resetTokenRepository.findByTokenAndUsedFalse(tokenOrOtp);
         if (tokenOpt.isEmpty()) {
-            tokenOpt = resetTokenRepository.findByOtpAndUsedFalse(tokenOrOtp);
+            tokenOpt = resetTokenRepository.findFirstByOtpAndUsedFalseOrderByExpiryDateDesc(tokenOrOtp);
         }
 
         PasswordResetToken resetToken = tokenOpt
@@ -163,6 +169,9 @@ public class AuthService {
         String userId = tokenProvider.getUserIdFromJWT(token);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+        if (!user.isActive()) {
+            throw new ForbiddenException(ErrorCode.FORBIDDEN);
+        }
 
         String newJwt = tokenProvider.generateTokenFromUserId(userId);
         return new JwtAuthenticationResponse(newJwt, JwtAuthenticationResponse.UserDto.fromEntity(user));
@@ -239,6 +248,10 @@ public class AuthService {
                     .build();
             return userRepository.save(newUser);
         });
+
+        if (!user.isActive()) {
+            throw new ForbiddenException(ErrorCode.FORBIDDEN);
+        }
 
         if ((user.getAvatar() == null || user.getAvatar().isBlank()) && finalPicture != null && !finalPicture.isBlank()) {
             user.setAvatar(finalPicture);

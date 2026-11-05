@@ -43,6 +43,9 @@ public class ReactionController {
             return ResponseEntity.ok(ApiResponse.success(null, "Unauthenticated"));
         }
         String emoji = reactionService.getUserReaction(postId, currentUser.getId());
+        if ("UPVOTE".equals(emoji) || "DOWNVOTE".equals(emoji)) {
+            emoji = null;
+        }
         return ResponseEntity.ok(ApiResponse.success(emoji, "User reaction fetched"));
     }
 }

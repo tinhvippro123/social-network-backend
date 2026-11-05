@@ -43,7 +43,9 @@ public class GroupService {
         requireManagerOrSystemMod(id, userId);
         group.setName(request.name().trim());
         group.setDescription(request.description());
-        group.setAvatar(request.avatar());
+        if (request.avatar() != null && !request.avatar().isBlank()) {
+            group.setAvatar(request.avatar());
+        }
         group.setCoverImage(request.coverImage());
         if (request.isPublic() != null) group.setPublicGroup(request.isPublic());
         return response(group, userId);
@@ -120,17 +122,22 @@ public class GroupService {
     public GroupPostResponse createPost(String id, String userId, GroupPostRequest request) {
         Group group = lock(id);
         GroupMember author = member(id, userId);
+        String sanitized = htmlSanitizer.sanitize(request.content());
+        if (sanitized.isBlank()) invalid();
         GroupPost post = GroupPost.builder().group(group).author(author.getUser()).title(request.title().trim())
-                .content(htmlSanitizer.sanitize(request.content())).excerpt(request.excerpt()).coverImage(request.coverImage()).build();
+                .content(sanitized).excerpt(request.excerpt()).coverImage(request.coverImage()).build();
         return postResponse(posts.save(post), userId);
     }
 
     public GroupPostResponse updatePost(String id, String postId, String userId, GroupPostRequest request) {
         lock(id);
+        if (!isSystemMod(userId)) member(id, userId);
         GroupPost post = findPost(id, postId);
         if (!post.getAuthor().getId().equals(userId) && !isSystemMod(userId)) forbidden();
+        String sanitized = htmlSanitizer.sanitize(request.content());
+        if (sanitized.isBlank()) invalid();
         post.setTitle(request.title().trim());
-        post.setContent(htmlSanitizer.sanitize(request.content()));
+        post.setContent(sanitized);
         post.setExcerpt(request.excerpt());
         post.setCoverImage(request.coverImage());
         post.setUpdatedAt(LocalDateTime.now());
@@ -150,7 +157,8 @@ public class GroupService {
     }
 
     public GroupLikeResponse togglePostLike(String id, String postId, String userId) {
-        requireReadable(group(id), userId);
+        Group group = lock(id);
+        requireReadable(group, userId);
         GroupPost post = findPost(id, postId);
         var existing = postLikes.findByPostIdAndUserId(postId, userId);
         boolean isLiked;
@@ -174,10 +182,12 @@ public class GroupService {
     public GroupCommentResponse addComment(String id, String postId, String userId, GroupCommentRequest request) {
         requireReadable(group(id), userId);
         GroupPost post = findPost(id, postId);
+        String sanitized = htmlSanitizer.sanitize(request.content().trim());
+        if (sanitized.isBlank()) invalid();
         GroupPostComment comment = GroupPostComment.builder()
                 .post(post)
                 .author(user(userId))
-                .content(htmlSanitizer.sanitize(request.content().trim()))
+                .content(sanitized)
                 .build();
         return GroupCommentResponse.from(postComments.save(comment));
     }

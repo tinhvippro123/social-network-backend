@@ -116,10 +116,19 @@ public class ReportService {
 
     private String targetTitle(Report.TargetType type, String id, String userId) {
         return switch (type) {
-            case POST -> publishedPost(id).getTitle();
+            case POST -> {
+                Post post = publishedPost(id);
+                if (post.getAuthor() != null && userId.equals(post.getAuthor().getId())) {
+                    throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Bạn không thể tự báo cáo bài viết của chính mình");
+                }
+                yield post.getTitle();
+            }
             case COMMENT -> {
                 Comment comment = comment(id);
                 if (comment.getPost().getStatus() != Post.PostStatus.PUBLISHED) throw new ResourceNotFoundException(ErrorCode.COMMENT_NOT_FOUND);
+                if (comment.getAuthor() != null && userId.equals(comment.getAuthor().getId())) {
+                    throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Bạn không thể tự báo cáo bình luận của chính mình");
+                }
                 yield comment.getContent().substring(0, Math.min(255, comment.getContent().length()));
             }
             case USER -> users.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND)).getName();
@@ -127,6 +136,9 @@ public class ReportService {
                 Group group = group(id);
                 if (!group.isPublicGroup() && !groupMembers.existsByGroupIdAndUserId(id, userId)) {
                     throw new ForbiddenException(ErrorCode.FORBIDDEN);
+                }
+                if (group.getOwner() != null && userId.equals(group.getOwner().getId())) {
+                    throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Bạn không thể tự báo cáo nhóm của chính mình");
                 }
                 yield group.getName();
             }
@@ -154,8 +166,18 @@ public class ReportService {
     private void removeTarget(Report report, User actor) {
         switch (report.getType()) {
             case POST -> posts.findById(report.getTargetId()).ifPresent(post -> {
+                boolean wasPublished = post.getStatus() == Post.PostStatus.PUBLISHED;
                 post.setStatus(Post.PostStatus.HIDDEN);
                 posts.save(post);
+                if (wasPublished) {
+                    if (post.getAuthor() != null) {
+                        post.getAuthor().setPostsCount(Math.max(0, post.getAuthor().getPostsCount() - 1));
+                        users.save(post.getAuthor());
+                    }
+                    if (post.getCategory() != null) {
+                        post.getCategory().setPostsCount(Math.max(0, post.getCategory().getPostsCount() - 1));
+                    }
+                }
             });
             case COMMENT -> comments.findById(report.getTargetId()).ifPresent(comment -> {
                 Post post = comment.getPost();

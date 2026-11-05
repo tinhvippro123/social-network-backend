@@ -166,6 +166,7 @@ public class ChatService {
         ChatMessage message = findMessage(id, messageId);
         if (!message.getSender().getId().equals(userId)) forbidden();
         message.setRevoked(true);
+        message.setPinned(false);
         message.setContent("");
         message.setFileName(null); message.setFileSize(null); message.setFileUrl(null); message.setImageUrl(null);
         List<ConversationMember> participants = members.findByConversationId(id);
@@ -179,6 +180,7 @@ public class ChatService {
         lock(id);
         member(id, userId);
         ChatMessage message = findMessage(id, messageId);
+        if (message.isRevoked() && pinned) invalid();
         message.setPinned(pinned);
         List<ConversationMember> participants = members.findByConversationId(id);
         for (ConversationMember recipient : participants) {
@@ -202,8 +204,18 @@ public class ChatService {
         String displayName = conversation.isGroupChat() ? conversation.getName()
                 : (nickname != null && !nickname.isBlank() ? nickname : other.name());
         ChatMessage latest = messages.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId()).orElse(null);
+        String previewText = "";
+        if (latest != null && !latest.isRevoked()) {
+            if (latest.getContent() != null && !latest.getContent().isBlank()) {
+                previewText = latest.getContent();
+            } else if ("image".equalsIgnoreCase(latest.getType())) {
+                previewText = "[Hình ảnh]";
+            } else if ("file".equalsIgnoreCase(latest.getType())) {
+                previewText = "[Tệp đính kèm]";
+            }
+        }
         return new ConversationResponse(conversation.getId(), displayName,
-                conversation.isGroupChat() ? null : other.avatar(), latest == null || latest.isRevoked() ? "" : latest.getContent(),
+                conversation.isGroupChat() ? null : other.avatar(), previewText,
                 latest == null ? conversation.getCreatedAt() : latest.getCreatedAt(),
                 messages.countUnread(conversation.getId(), viewer.getUser().getId(), viewer.getLastReadAt()), conversation.isGroupChat(), false,
                 viewer.isPinned(), viewer.isMuted(), participants, nickname);

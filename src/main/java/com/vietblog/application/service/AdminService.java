@@ -1,11 +1,14 @@
 package com.vietblog.application.service;
 
 import com.vietblog.application.dto.admin.AdminDtos;
+import com.vietblog.domain.entity.Group;
+import com.vietblog.domain.entity.GroupMember;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.Report;
 import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ErrorCode;
+import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.infrastructure.repository.AdminPostRepository;
 import com.vietblog.infrastructure.repository.AdminUserRepository;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -73,7 +77,7 @@ public class AdminService {
                 usersInRange, postsInRange, topCategories(), recentActivities());
     }
 
-    private java.util.List<AdminDtos.CategoryStat> topCategories() {
+    private List<AdminDtos.CategoryStat> topCategories() {
         var rows = posts.countByCategory(PageRequest.of(0, 6));
         long max = rows.stream().mapToLong(r -> ((Number) r[2]).longValue()).max().orElse(0);
         return rows.stream().map(r -> {
@@ -83,7 +87,7 @@ public class AdminService {
         }).toList();
     }
 
-    private java.util.List<AdminDtos.Activity> recentActivities() {
+    private List<AdminDtos.Activity> recentActivities() {
         var list = new ArrayList<AdminDtos.Activity>();
         posts.findTop5ByOrderByCreatedAtDesc().forEach(p -> list.add(new AdminDtos.Activity("post",
                 p.getAuthor().getName() + " đã đăng bài \"" + p.getTitle() + "\"", p.getCreatedAt())));
@@ -144,9 +148,21 @@ public class AdminService {
     @Transactional
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public AdminDtos.PostResponse changePostStatus(String id, Post.PostStatus status) {
+        if (status == Post.PostStatus.DRAFT) {
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        }
         Post post = posts.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
+        if (post.getStatus() == Post.PostStatus.DRAFT) {
+            throw new ForbiddenException(ErrorCode.FORBIDDEN);
+        }
         post.setStatus(status);
-        return AdminDtos.PostResponse.from(posts.save(post));
+        Post saved = posts.saveAndFlush(post);
+        postApplicationService.syncAuthorAndCategoryCounters(saved.getAuthor(), saved.getCategory());
+        long reportCount = reports != null
+                ? reports.countByTargetIds(Report.TargetType.POST, List.of(saved.getId())).stream()
+                        .mapToLong(r -> ((Number) r[1]).longValue()).findFirst().orElse(0L)
+                : 0L;
+        return AdminDtos.PostResponse.from(saved, reportCount);
     }
 
     @Transactional
@@ -157,9 +173,17 @@ public class AdminService {
         }
         User actor = users.findById(actorId).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
-        // 1. Clear followers / following join table
-        user.getFollowers().forEach(f -> f.getFollowing().remove(user));
-        user.getFollowing().forEach(f -> f.getFollowers().remove(user));
+        // 1. Clear followers / following join table & sync peer counters
+        for (User follower : new ArrayList<>(user.getFollowers())) {
+            follower.getFollowing().remove(user);
+            follower.setFollowingCount(Math.max(0, follower.getFollowingCount() - 1));
+            users.save(follower);
+        }
+        for (User followed : new ArrayList<>(user.getFollowing())) {
+            followed.getFollowers().remove(user);
+            followed.setFollowersCount(Math.max(0, followed.getFollowersCount() - 1));
+            users.save(followed);
+        }
         user.getFollowers().clear();
         user.getFollowing().clear();
         users.saveAndFlush(user);
@@ -171,20 +195,44 @@ public class AdminService {
         em.createQuery("UPDATE Report r SET r.resolvedBy = null WHERE r.resolvedBy.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM Report r WHERE r.reporter.id = :uid").setParameter("uid", id).executeUpdate();
 
-        // 3. Clean up chat messages & memberships
+        // 3. Clean up chat messages, memberships & reassign created conversations to actor
         em.createQuery("UPDATE ChatMessage m SET m.replyTo = null WHERE m.replyTo.sender.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM ChatMessage m WHERE m.sender.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM ConversationMember cm WHERE cm.user.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("UPDATE Conversation c SET c.creator = :actor WHERE c.creator.id = :uid")
+                .setParameter("actor", actor).setParameter("uid", id).executeUpdate();
 
         // 4. Clean up group interactions & reassign owned groups to actor
         em.createQuery("DELETE FROM GroupPostLike l WHERE l.user.id = :uid OR l.post.author.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM GroupPostComment c WHERE c.author.id = :uid OR c.post.author.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM GroupPost p WHERE p.author.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM GroupMember gm WHERE gm.user.id = :uid").setParameter("uid", id).executeUpdate();
-        em.createQuery("UPDATE Group g SET g.owner = :actor WHERE g.owner.id = :uid")
-                .setParameter("actor", actor).setParameter("uid", id).executeUpdate();
+
+        List<Group> ownedGroups = em.createQuery("SELECT g FROM Group g WHERE g.owner.id = :uid", Group.class)
+                .setParameter("uid", id).getResultList();
+        for (Group g : ownedGroups) {
+            g.setOwner(actor);
+            Long existingMembership = em.createQuery(
+                    "SELECT COUNT(gm) FROM GroupMember gm WHERE gm.group.id = :gid AND gm.user.id = :aid", Long.class)
+                    .setParameter("gid", g.getId()).setParameter("aid", actorId).getSingleResult();
+            if (existingMembership == null || existingMembership == 0) {
+                em.persist(GroupMember.builder().group(g).user(actor).role(GroupMember.Role.OWNER).build());
+            } else {
+                em.createQuery("UPDATE GroupMember gm SET gm.role = :role WHERE gm.group.id = :gid AND gm.user.id = :aid")
+                        .setParameter("role", GroupMember.Role.OWNER)
+                        .setParameter("gid", g.getId())
+                        .setParameter("aid", actorId)
+                        .executeUpdate();
+            }
+        }
 
         // 5. Clean up reactions, bookmarks, comments, and posts authored by user
+        List<String> affectedPostIds = new ArrayList<>();
+        affectedPostIds.addAll(em.createQuery("SELECT DISTINCT r.post.id FROM Reaction r WHERE r.user.id = :uid", String.class)
+                .setParameter("uid", id).getResultList());
+        affectedPostIds.addAll(em.createQuery("SELECT DISTINCT c.post.id FROM Comment c WHERE c.author.id = :uid", String.class)
+                .setParameter("uid", id).getResultList());
+
         em.createQuery("DELETE FROM Reaction r WHERE r.user.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM Bookmark b WHERE b.user.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("UPDATE Comment c SET c.parent = null WHERE c.parent.author.id = :uid").setParameter("uid", id).executeUpdate();
@@ -194,6 +242,22 @@ public class AdminService {
                 .setParameter("uid", id).getResultList();
         for (String postId : authoredPostIds) {
             postApplicationService.deletePost(postId, actorId);
+        }
+
+        for (String pid : affectedPostIds.stream().distinct().toList()) {
+            if (!authoredPostIds.contains(pid)) {
+                posts.findById(pid).ifPresent(p -> {
+                    long commentCount = comments.countByPostId(pid);
+                    Long upCount = em.createQuery("SELECT COUNT(r) FROM Reaction r WHERE r.post.id = :pid AND r.emoji = 'UPVOTE'", Long.class)
+                            .setParameter("pid", pid).getSingleResult();
+                    Long downCount = em.createQuery("SELECT COUNT(r) FROM Reaction r WHERE r.post.id = :pid AND r.emoji = 'DOWNVOTE'", Long.class)
+                            .setParameter("pid", pid).getSingleResult();
+                    p.setCommentsCount(Math.toIntExact(commentCount));
+                    p.setUpvotesCount(upCount == null ? 0 : Math.toIntExact(upCount));
+                    p.setDownvotesCount(downCount == null ? 0 : Math.toIntExact(downCount));
+                    posts.save(p);
+                });
+            }
         }
 
         em.flush();
