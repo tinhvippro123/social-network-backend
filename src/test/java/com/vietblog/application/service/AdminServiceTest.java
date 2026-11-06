@@ -22,6 +22,7 @@ class AdminServiceTest {
     @Mock CommentRepository comments;
     @Mock ReportRepository reports;
     @Mock GroupRepository groups;
+    @Mock PostApplicationService postApplicationService;
     @InjectMocks AdminService service;
 
     @Test

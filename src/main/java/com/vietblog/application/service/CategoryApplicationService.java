@@ -77,7 +77,9 @@ public class CategoryApplicationService {
                     });
         }
 
-        category.setDescription(request.getDescription());
+        if (request.getDescription() != null) {
+            category.setDescription(request.getDescription());
+        }
         if (request.getIcon() != null && !request.getIcon().isBlank()) {
             category.setIcon(request.getIcon().trim());
         }

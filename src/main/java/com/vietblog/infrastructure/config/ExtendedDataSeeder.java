@@ -335,10 +335,12 @@ public class ExtendedDataSeeder implements CommandLineRunner {
                     .viewsCount(seed.viewsCount())
                     .upvotesCount(seed.upvotesCount())
                     .downvotesCount(seed.downvotesCount())
+                    .commentsCount(countSeedComments(seed.comments()))
                     .createdAt(createdAt)
                     .updatedAt(createdAt)
                     .build();
 
+            postDomainService.calculateTrendingScore(post);
             post = postRepository.save(post);
             postsByKey.put(seed.key(), post);
 
@@ -813,12 +815,27 @@ public class ExtendedDataSeeder implements CommandLineRunner {
         reportRepository.flush();
     }
 
+    private int countSeedComments(List<CommentSeed> seeds) {
+        if (seeds == null || seeds.isEmpty()) return 0;
+        int total = 0;
+        for (CommentSeed s : seeds) {
+            total += 1 + countSeedComments(s.replies());
+        }
+        return total;
+    }
+
     private void syncAllCounters() {
         for (Post post : postRepository.findAll()) {
             int commentCount = Math.toIntExact(commentRepository.countByPostId(post.getId()));
-            post.setCommentsCount(commentCount);
-            postDomainService.calculateTrendingScore(post);
-            postRepository.save(post);
+            boolean changed = false;
+            if (post.getCommentsCount() != commentCount) {
+                post.setCommentsCount(commentCount);
+                changed = true;
+            }
+            if (post.getTrendingScore() <= 0.0 || changed) {
+                postDomainService.calculateTrendingScore(post);
+                postRepository.save(post);
+            }
         }
 
         for (User user : userRepository.findAll()) {

@@ -196,19 +196,19 @@ public class AdminService {
         em.createQuery("DELETE FROM Report r WHERE r.reporter.id = :uid").setParameter("uid", id).executeUpdate();
 
         // 3. Clean up chat messages, memberships & reassign created conversations to actor
-        em.createQuery("UPDATE ChatMessage m SET m.replyTo = null WHERE m.replyTo.sender.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("UPDATE ChatMessage m SET m.replyTo = null WHERE m.replyTo.id IN (SELECT r.id FROM ChatMessage r WHERE r.sender.id = :uid)").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM ChatMessage m WHERE m.sender.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM ConversationMember cm WHERE cm.user.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("UPDATE Conversation c SET c.creator = :actor WHERE c.creator.id = :uid")
                 .setParameter("actor", actor).setParameter("uid", id).executeUpdate();
 
         // 4. Clean up group interactions & reassign owned groups to actor
-        em.createQuery("DELETE FROM GroupPostLike l WHERE l.user.id = :uid OR l.post.author.id = :uid").setParameter("uid", id).executeUpdate();
-        em.createQuery("DELETE FROM GroupPostComment c WHERE c.author.id = :uid OR c.post.author.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM GroupPostLike l WHERE l.user.id = :uid OR l.post.id IN (SELECT p.id FROM GroupPost p WHERE p.author.id = :uid)").setParameter("uid", id).executeUpdate();
+        em.createQuery("DELETE FROM GroupPostComment c WHERE c.author.id = :uid OR c.post.id IN (SELECT p.id FROM GroupPost p WHERE p.author.id = :uid)").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM GroupPost p WHERE p.author.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM GroupMember gm WHERE gm.user.id = :uid").setParameter("uid", id).executeUpdate();
 
-        List<Group> ownedGroups = em.createQuery("SELECT g FROM Group g WHERE g.owner.id = :uid", Group.class)
+        List<Group> ownedGroups = em.createQuery("SELECT g FROM CommunityGroup g WHERE g.owner.id = :uid", Group.class)
                 .setParameter("uid", id).getResultList();
         for (Group g : ownedGroups) {
             g.setOwner(actor);
@@ -233,9 +233,16 @@ public class AdminService {
         affectedPostIds.addAll(em.createQuery("SELECT DISTINCT c.post.id FROM Comment c WHERE c.author.id = :uid", String.class)
                 .setParameter("uid", id).getResultList());
 
+        List<String> upvotedPostIds = em.createQuery(
+                "SELECT r.post.id FROM Reaction r WHERE r.user.id = :uid AND r.emoji = 'UPVOTE'", String.class)
+                .setParameter("uid", id).getResultList();
+        List<String> downvotedPostIds = em.createQuery(
+                "SELECT r.post.id FROM Reaction r WHERE r.user.id = :uid AND r.emoji = 'DOWNVOTE'", String.class)
+                .setParameter("uid", id).getResultList();
+
         em.createQuery("DELETE FROM Reaction r WHERE r.user.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM Bookmark b WHERE b.user.id = :uid").setParameter("uid", id).executeUpdate();
-        em.createQuery("UPDATE Comment c SET c.parent = null WHERE c.parent.author.id = :uid").setParameter("uid", id).executeUpdate();
+        em.createQuery("UPDATE Comment c SET c.parent = null WHERE c.parent.id IN (SELECT p.id FROM Comment p WHERE p.author.id = :uid)").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM Comment c WHERE c.author.id = :uid").setParameter("uid", id).executeUpdate();
 
         var authoredPostIds = em.createQuery("SELECT p.id FROM Post p WHERE p.author.id = :uid", String.class)
@@ -248,13 +255,13 @@ public class AdminService {
             if (!authoredPostIds.contains(pid)) {
                 posts.findById(pid).ifPresent(p -> {
                     long commentCount = comments.countByPostId(pid);
-                    Long upCount = em.createQuery("SELECT COUNT(r) FROM Reaction r WHERE r.post.id = :pid AND r.emoji = 'UPVOTE'", Long.class)
-                            .setParameter("pid", pid).getSingleResult();
-                    Long downCount = em.createQuery("SELECT COUNT(r) FROM Reaction r WHERE r.post.id = :pid AND r.emoji = 'DOWNVOTE'", Long.class)
-                            .setParameter("pid", pid).getSingleResult();
                     p.setCommentsCount(Math.toIntExact(commentCount));
-                    p.setUpvotesCount(upCount == null ? 0 : Math.toIntExact(upCount));
-                    p.setDownvotesCount(downCount == null ? 0 : Math.toIntExact(downCount));
+                    if (upvotedPostIds.contains(pid)) {
+                        p.setUpvotesCount(Math.max(0, p.getUpvotesCount() - 1));
+                    }
+                    if (downvotedPostIds.contains(pid)) {
+                        p.setDownvotesCount(Math.max(0, p.getDownvotesCount() - 1));
+                    }
                     posts.save(p);
                 });
             }

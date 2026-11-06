@@ -100,7 +100,7 @@ public class PostApplicationService {
         validatePage(page, limit);
         PageRequest pageRequest = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
         return postRepository.findByStatus(Post.PostStatus.PUBLISHED, pageRequest)
-                .map(PostResponse::fromEntity);
+                .map(post -> mapPostResponse(post, null));
     }
 
     @Transactional(readOnly = true)
