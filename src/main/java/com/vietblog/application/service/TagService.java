@@ -40,8 +40,9 @@ public class TagService {
 
     @Transactional(readOnly = true)
     public List<TagResponse> list(String search, int limit) {
-        if (limit < 1 || limit > 100 || search.length() > 100) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
-        return tags.findPopular(search.trim(), PageRequest.of(0, limit)).stream()
+        String q = search == null ? "" : search.trim();
+        if (limit < 1 || limit > 100 || q.length() > 100) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        return tags.findPopular(q, PageRequest.of(0, limit)).stream()
                 .map(tag -> new TagResponse(tag.getName(), tag.getPostsCount())).toList();
     }
 }

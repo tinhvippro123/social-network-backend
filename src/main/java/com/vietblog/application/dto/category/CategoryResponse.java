@@ -18,13 +18,17 @@ public class CategoryResponse {
     private LocalDateTime createdAt;
 
     public static CategoryResponse fromEntity(Category category) {
+        return fromEntity(category, category.getPostsCount());
+    }
+
+    public static CategoryResponse fromEntity(Category category, int postsCount) {
         return CategoryResponse.builder()
                 .id(category.getId())
                 .name(category.getName())
                 .slug(category.getSlug())
                 .description(category.getDescription())
                 .icon(category.getIcon())
-                .postsCount(category.getPostsCount())
+                .postsCount(postsCount)
                 .createdAt(category.getCreatedAt())
                 .build();
     }

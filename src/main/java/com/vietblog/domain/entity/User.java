@@ -40,7 +40,7 @@ public class User {
 
     private LocalDateTime lastLoginAt;
 
-    // Äáº¿m cache (cáº­p nháº­t khi cÃ³ thay Ä‘á»•i, trÃ¡nh COUNT query)
+    // Đếm cache (cập nhật khi có thay đổi, tránh COUNT query)
     @Builder.Default
     private int postsCount = 0;
     @Builder.Default

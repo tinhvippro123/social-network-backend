@@ -1,6 +1,8 @@
 package com.vietblog.application.service;
 
+import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.infrastructure.repository.*;
+import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,7 +28,9 @@ class AdminAuthorizationTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
-        context.close();
+        if (context != null) {
+            context.close();
+        }
     }
 
     @Test
@@ -55,15 +59,18 @@ class AdminAuthorizationTest {
     @Configuration(proxyBeanMethods = false)
     @EnableMethodSecurity
     static class Config {
+        @Bean EntityManagerFactory entityManagerFactory() { return mock(EntityManagerFactory.class); }
         @Bean AdminUserRepository users() { return mock(AdminUserRepository.class); }
         @Bean AdminPostRepository posts() { return mock(AdminPostRepository.class); }
         @Bean CommentRepository comments() { return mock(CommentRepository.class); }
         @Bean ReportRepository reports() { return mock(ReportRepository.class); }
         @Bean GroupRepository groups() { return mock(GroupRepository.class); }
         @Bean PostApplicationService postApplicationService() { return mock(PostApplicationService.class); }
+        @Bean PostDomainService postDomainService() { return mock(PostDomainService.class); }
         @Bean AdminService admin(AdminUserRepository users, AdminPostRepository posts, CommentRepository comments,
-                                 ReportRepository reports, GroupRepository groups, PostApplicationService postApplicationService) {
-            return new AdminService(users, posts, comments, reports, groups, postApplicationService);
+                                 ReportRepository reports, GroupRepository groups,
+                                 PostApplicationService postApplicationService, PostDomainService postDomainService) {
+            return new AdminService(users, posts, comments, reports, groups, postApplicationService, postDomainService);
         }
     }
 }

@@ -13,11 +13,13 @@ import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.infrastructure.repository.AdminPostRepository;
 import com.vietblog.infrastructure.repository.AdminUserRepository;
+import com.vietblog.infrastructure.repository.CategoryRepository;
 import com.vietblog.infrastructure.repository.CommentRepository;
 import com.vietblog.infrastructure.repository.GroupMemberRepository;
 import com.vietblog.infrastructure.repository.GroupRepository;
 import com.vietblog.infrastructure.repository.NotificationRepository;
 import com.vietblog.infrastructure.repository.ReportRepository;
+import com.vietblog.domain.service.PostDomainService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,11 +39,13 @@ public class ReportService {
     private final GroupRepository groups;
     private final GroupMemberRepository groupMembers;
     private final GroupService groupService;
+    private final CategoryRepository categories;
+    private final PostDomainService postDomainService;
 
     @Transactional
     public ReportDtos.Response create(String userId, ReportDtos.CreateRequest request) {
         User reporter = users.findLockedById(userId).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
-        String title = targetTitle(request.type(), request.targetId(), userId);
+        String title = targetTitle(request.type(), request.targetId(), userId, request.reason());
         if (reports.existsByReporterIdAndTargetIdAndTypeAndStatus(userId, request.targetId(), request.type(), Report.ReportStatus.PENDING)) {
             throw new BusinessRuleException(ErrorCode.REPORT_ALREADY_PENDING);
         }
@@ -114,7 +118,7 @@ public class ReportService {
         return ReportDtos.Response.from(report, targetPostId);
     }
 
-    private String targetTitle(Report.TargetType type, String id, String userId) {
+    private String targetTitle(Report.TargetType type, String id, String userId, String reason) {
         return switch (type) {
             case POST -> {
                 Post post = publishedPost(id);
@@ -131,7 +135,14 @@ public class ReportService {
                 }
                 yield comment.getContent().substring(0, Math.min(255, comment.getContent().length()));
             }
-            case USER -> users.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND)).getName();
+            case USER -> {
+                User targetUser = users.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+                boolean isAccountRequest = reason != null && reason.trim().startsWith("Yêu cầu ");
+                if (userId != null && userId.equals(id) && !isAccountRequest) {
+                    throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Bạn không thể tự báo cáo tài khoản của chính mình");
+                }
+                yield targetUser.getName();
+            }
             case GROUP -> {
                 Group group = group(id);
                 if (!group.isPublicGroup() && !groupMembers.existsByGroupIdAndUserId(id, userId)) {
@@ -176,6 +187,9 @@ public class ReportService {
                     }
                     if (post.getCategory() != null) {
                         post.getCategory().setPostsCount(Math.max(0, post.getCategory().getPostsCount() - 1));
+                        if (categories != null) {
+                            categories.save(post.getCategory());
+                        }
                     }
                 }
             });
@@ -185,6 +199,9 @@ public class ReportService {
                 comments.flush();
                 if (post != null) {
                     post.setCommentsCount(Math.toIntExact(comments.countByPostId(post.getId())));
+                    if (postDomainService != null) {
+                        postDomainService.calculateTrendingScore(post);
+                    }
                     posts.save(post);
                 }
             });

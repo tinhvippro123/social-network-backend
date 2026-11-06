@@ -857,6 +857,5 @@ public class ExtendedDataSeeder implements CommandLineRunner {
         postRepository.flush();
         userRepository.flush();
         categoryRepository.flush();
-        userRepository.flush();
     }
 }

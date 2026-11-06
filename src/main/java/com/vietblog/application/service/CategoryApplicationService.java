@@ -108,7 +108,6 @@ public class CategoryApplicationService {
         int publishedCount = Math.toIntExact(
                 postRepository.countByCategoryIdAndStatus(category.getId(), Post.PostStatus.PUBLISHED)
         );
-        category.setPostsCount(publishedCount);
-        return CategoryResponse.fromEntity(category);
+        return CategoryResponse.fromEntity(category, publishedCount);
     }
 }

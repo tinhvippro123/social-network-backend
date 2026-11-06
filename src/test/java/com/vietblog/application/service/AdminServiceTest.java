@@ -2,6 +2,7 @@ package com.vietblog.application.service;
 
 import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.BusinessRuleException;
+import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.infrastructure.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,7 @@ class AdminServiceTest {
     @Mock ReportRepository reports;
     @Mock GroupRepository groups;
     @Mock PostApplicationService postApplicationService;
+    @Mock PostDomainService postDomainService;
     @InjectMocks AdminService service;
 
     @Test

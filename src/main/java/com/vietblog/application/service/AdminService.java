@@ -15,6 +15,7 @@ import com.vietblog.infrastructure.repository.AdminUserRepository;
 import com.vietblog.infrastructure.repository.CommentRepository;
 import com.vietblog.infrastructure.repository.GroupRepository;
 import com.vietblog.infrastructure.repository.ReportRepository;
+import com.vietblog.domain.service.PostDomainService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ public class AdminService {
     private final ReportRepository reports;
     private final GroupRepository groups;
     private final PostApplicationService postApplicationService;
+    private final PostDomainService postDomainService;
 
     @PersistenceContext
     private EntityManager em;
@@ -103,7 +105,8 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public Page<AdminDtos.UserResponse> users(User.Role role, String search, int page, int limit) {
-        return users.search(role, search.trim(), page(page, limit, "joinedAt")).map(this::toUserResponse);
+        String q = search == null ? "" : search.trim();
+        return users.search(role, q, page(page, limit, "joinedAt")).map(this::toUserResponse);
     }
 
     private AdminDtos.UserResponse toUserResponse(User user) {
@@ -113,7 +116,8 @@ public class AdminService {
     @Transactional(readOnly = true)
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public Page<AdminDtos.PostResponse> posts(Post.PostStatus status, String search, int page, int limit) {
-        Page<Post> paged = posts.search(status, search.trim(), page(page, limit, "createdAt"));
+        String q = search == null ? "" : search.trim();
+        Page<Post> paged = posts.search(status, q, page(page, limit, "createdAt"));
         if (paged.isEmpty()) {
             return paged.map(AdminDtos.PostResponse::from);
         }
@@ -261,6 +265,9 @@ public class AdminService {
                     }
                     if (downvotedPostIds.contains(pid)) {
                         p.setDownvotesCount(Math.max(0, p.getDownvotesCount() - 1));
+                    }
+                    if (postDomainService != null) {
+                        postDomainService.calculateTrendingScore(p);
                     }
                     posts.save(p);
                 });

@@ -7,8 +7,8 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 /**
- * Reaction (emoji) trÃªn bÃ i viáº¿t.
- * Má»—i user chá»‰ react 1 emoji cho 1 bÃ i viáº¿t.
+ * Reaction (emoji) trên bài viết.
+ * Mỗi user chỉ react 1 emoji cho 1 bài viết.
  */
 @Entity
 @Table(name = "reactions", uniqueConstraints = {
