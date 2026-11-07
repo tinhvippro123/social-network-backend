@@ -3,6 +3,7 @@ package com.vietblog.infrastructure.exception;
 import com.vietblog.application.dto.ApiResponse;
 import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.DomainException;
+import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -61,7 +62,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ApiResponse<Object>> handleBusinessRuleException(BusinessRuleException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        HttpStatus status = ex.getErrorCode() == ErrorCode.UNAUTHORIZED
+                ? HttpStatus.UNAUTHORIZED
+                : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status)
                 .body(ApiResponse.error(ex.getErrorCode().name(), ex.getMessage()));
     }
 

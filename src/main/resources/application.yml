@@ -44,6 +44,13 @@ jwt:
   secret: ${JWT_SECRET:VietBlog2026SecretKeyForJWTTokenGenerationMustBeAtLeast256Bits}
   access-token-expiration: 86400000   # 24 hours
   refresh-token-expiration: 604800000 # 7 days
+  cookie:
+    access-name: ${JWT_ACCESS_COOKIE_NAME:vietblog_access_token}
+    refresh-name: ${JWT_REFRESH_COOKIE_NAME:vietblog_refresh_token}
+    status-name: ${JWT_STATUS_COOKIE_NAME:vietblog_logged_in}
+    secure: ${JWT_COOKIE_SECURE:false}
+    same-site: ${JWT_COOKIE_SAME_SITE:Lax}
+    domain: ${JWT_COOKIE_DOMAIN:}
 
 # ── CORS ──────────────────────────────────
 cors:

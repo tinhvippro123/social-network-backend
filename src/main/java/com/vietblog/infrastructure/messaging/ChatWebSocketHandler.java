@@ -5,9 +5,11 @@ import com.vietblog.application.service.ChatEvent;
 import com.vietblog.application.service.ChatService;
 import com.vietblog.domain.exception.DomainException;
 import com.vietblog.infrastructure.repository.UserRepository;
+import com.vietblog.infrastructure.security.AuthCookieService;
 import com.vietblog.infrastructure.security.JwtTokenProvider;
 import jakarta.annotation.PreDestroy;
 import jakarta.validation.Validator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -23,14 +25,23 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final ChatService service;
     private final ObjectMapper json;
     private final Validator validator;
+    private final AuthCookieService cookieService;
     private final ConcurrentMap<String, Client> clients = new ConcurrentHashMap<>();
     private final ScheduledExecutorService expiry = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "chat-session-expiry"); thread.setDaemon(true); return thread;
     });
 
-    public ChatWebSocketHandler(JwtTokenProvider tokens, UserRepository users, ChatService service, ObjectMapper json, Validator validator) {
-        this.tokens = tokens; this.users = users; this.service = service; this.json = json; this.validator = validator;
+    @Autowired
+    public ChatWebSocketHandler(JwtTokenProvider tokens, UserRepository users, ChatService service,
+            ObjectMapper json, Validator validator, AuthCookieService cookieService) {
+        this.tokens = tokens; this.users = users; this.service = service;
+        this.json = json; this.validator = validator; this.cookieService = cookieService;
         expiry.scheduleWithFixedDelay(this::expireSessions, 10, 10, TimeUnit.SECONDS);
+    }
+
+    public ChatWebSocketHandler(JwtTokenProvider tokens, UserRepository users, ChatService service,
+            ObjectMapper json, Validator validator) {
+        this(tokens, users, service, json, validator, AuthCookieService.defaultInstance());
     }
 
     public record Frame(String type, String token, String conversationId, SendRequest message) {}
@@ -38,7 +49,21 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override public void afterConnectionEstablished(WebSocketSession session) {
         session.setTextMessageSizeLimit(32768);
-        clients.put(session.getId(), new Client(session, null, null, System.currentTimeMillis()));
+        long now = System.currentTimeMillis();
+        String cookieToken = cookieService.extractAccessTokenFromHeaders(session.getHandshakeHeaders());
+        if (cookieToken != null && validToken(cookieToken)) {
+            String userId = tokens.getUserIdFromJWT(cookieToken);
+            if (users.findById(userId).map(u -> u.isActive()).orElse(false)) {
+                clients.put(session.getId(), new Client(session, userId, cookieToken, now));
+                try {
+                    send(session, Map.of("type", "authenticated", "userId", userId));
+                } catch (IOException ex) {
+                    close(session, CloseStatus.SERVER_ERROR);
+                }
+                return;
+            }
+        }
+        clients.put(session.getId(), new Client(session, null, null, now));
     }
 
     @Override protected void handleTextMessage(WebSocketSession session, TextMessage text) throws IOException {
@@ -59,6 +84,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
             if (!validClient(client)) { close(session, CloseStatus.POLICY_VIOLATION); return; }
+            if ("auth".equals(frame.type())) { send(session, Map.of("type", "authenticated", "userId", client.userId())); return; }
             if ("ping".equals(frame.type())) { send(session, Map.of("type", "pong")); return; }
             if (frame.conversationId() == null || frame.conversationId().isBlank()) throw new IllegalArgumentException("conversationId is required");
             switch (frame.type() == null ? "" : frame.type()) {

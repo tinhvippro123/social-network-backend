@@ -46,21 +46,22 @@ public class AuthService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public JwtAuthenticationResponse login(LoginRequest request) {
+    public AuthSessionResult login(LoginRequest request) {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword())
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = tokenProvider.generateToken(authentication);
+        String accessToken = tokenProvider.generateToken(authentication);
 
         User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        return new JwtAuthenticationResponse(jwt, JwtAuthenticationResponse.UserDto.fromEntity(user));
+        String refreshToken = tokenProvider.generateRefreshTokenFromUserId(user.getId());
+        return new AuthSessionResult(accessToken, refreshToken, JwtAuthenticationResponse.UserDto.fromEntity(user));
     }
 
     @Transactional
@@ -161,8 +162,8 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public JwtAuthenticationResponse refreshToken(String token) {
-        if (!tokenProvider.validateToken(token)) {
+    public AuthSessionResult refreshToken(String token) {
+        if (token == null || token.isBlank() || !tokenProvider.validateRefreshToken(token)) {
             throw new BusinessRuleException(ErrorCode.UNAUTHORIZED);
         }
 
@@ -173,12 +174,13 @@ public class AuthService {
             throw new ForbiddenException(ErrorCode.FORBIDDEN);
         }
 
-        String newJwt = tokenProvider.generateTokenFromUserId(userId);
-        return new JwtAuthenticationResponse(newJwt, JwtAuthenticationResponse.UserDto.fromEntity(user));
+        String newAccess = tokenProvider.generateTokenFromUserId(userId);
+        String newRefresh = tokenProvider.generateRefreshTokenFromUserId(userId);
+        return new AuthSessionResult(newAccess, newRefresh, JwtAuthenticationResponse.UserDto.fromEntity(user));
     }
 
     @Transactional
-    public JwtAuthenticationResponse loginWithGoogle(GoogleLoginRequest request) {
+    public AuthSessionResult loginWithGoogle(GoogleLoginRequest request) {
         String email = null;
         String name = null;
         String picture = null;
@@ -259,7 +261,8 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        String jwt = tokenProvider.generateTokenFromUserId(user.getId());
-        return new JwtAuthenticationResponse(jwt, JwtAuthenticationResponse.UserDto.fromEntity(user));
+        String accessToken = tokenProvider.generateTokenFromUserId(user.getId());
+        String refreshToken = tokenProvider.generateRefreshTokenFromUserId(user.getId());
+        return new AuthSessionResult(accessToken, refreshToken, JwtAuthenticationResponse.UserDto.fromEntity(user));
     }
 }

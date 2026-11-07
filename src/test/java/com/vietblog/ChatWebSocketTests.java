@@ -58,6 +58,25 @@ class ChatWebSocketTests {
         verify(session, never()).sendMessage(any());
     }
 
+    @Test void handshakeCookieAuthenticatesImmediatelyWithoutAuthFrame() throws Exception {
+        WebSocketSession cookieSession = mock(WebSocketSession.class);
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add(org.springframework.http.HttpHeaders.COOKIE, "vietblog_access_token=cookie-valid");
+        when(cookieSession.getId()).thenReturn("cookie-session");
+        when(cookieSession.isOpen()).thenReturn(true);
+        when(cookieSession.getHandshakeHeaders()).thenReturn(headers);
+        when(tokens.validateToken("cookie-valid")).thenReturn(true);
+        when(tokens.getUserIdFromJWT("cookie-valid")).thenReturn("user-1");
+
+        handler.afterConnectionEstablished(cookieSession);
+        verify(cookieSession).sendMessage(argThat(m -> ((TextMessage) m).getPayload().contains("\"authenticated\"")));
+
+        clearInvocations(cookieSession);
+        when(chat.canReceive("conversation", "user-1")).thenReturn(true);
+        handler.deliver(new ChatEvent("message.created", "conversation", "user-1", Map.of("content", "hello")));
+        verify(cookieSession).sendMessage(any(TextMessage.class));
+    }
+
     private void authenticate() throws Exception {
         when(tokens.validateToken("valid")).thenReturn(true);
         when(tokens.getUserIdFromJWT("valid")).thenReturn("user-1");
