@@ -42,23 +42,35 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) -> {
-                response.setStatus(401);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"success\":false,\"message\":\"Authentication required\",\"errorCode\":\"UNAUTHORIZED\"}");
-            }))
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint((request, response, exception) -> {
+                    response.setStatus(401);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"success\":false,\"message\":\"Authentication required\",\"errorCode\":\"UNAUTHORIZED\"}");
+                })
+                .accessDeniedHandler((request, response, exception) -> {
+                    response.setStatus(403);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"success\":false,\"message\":\"Bạn không có quyền thực hiện hành động này\",\"errorCode\":\"FORBIDDEN\"}");
+                })
+            )
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/me", "/api/auth/me/**").authenticated()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/api/admin/reports/**", "/api/admin/posts/**").hasAnyRole("ADMIN", "MODERATOR")
+                .requestMatchers("/api/moderation/**").hasAnyRole("ADMIN", "MODERATOR")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/categories", "/api/categories/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/tags/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/search/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/search/image", "/api/search/document").permitAll()
-                .requestMatchers("/api/users/me").authenticated()
+                .requestMatchers("/api/users/me", "/api/users/me/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/users/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/groups/**").permitAll()
                 .anyRequest().authenticated()

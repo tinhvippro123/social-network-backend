@@ -121,6 +121,9 @@ public class PostApplicationService {
             } catch (IllegalArgumentException e) {
                 throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
             }
+            if (status == Post.PostStatus.HIDDEN) {
+                throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Trạng thái bài viết không hợp lệ");
+            }
         }
 
         String sanitizedContent = htmlSanitizer.sanitize(request.getContent());
@@ -264,6 +267,9 @@ public class PostApplicationService {
                 status = Post.PostStatus.valueOf(request.getStatus().toUpperCase());
             } catch (IllegalArgumentException e) {
                 throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+            }
+            if (status == Post.PostStatus.HIDDEN) {
+                throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Trạng thái bài viết không hợp lệ");
             }
         }
 

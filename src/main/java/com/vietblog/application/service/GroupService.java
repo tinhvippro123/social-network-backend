@@ -240,13 +240,20 @@ public class GroupService {
         requireManager(id, userId);
     }
     private boolean isSystemMod(String userId) {
-        if (userId == null) return false;
+        if (userId == null || userId.isBlank()) return false;
         return users.findById(userId)
                 .map(u -> u.isActive() && (u.getRole() == User.Role.ADMIN || u.getRole() == User.Role.MODERATOR))
                 .orElse(false);
     }
     private void requireReadable(Group group, String userId) {
-        if (!group.isPublicGroup() && !members.existsByGroupIdAndUserId(group.getId(), userId) && !isSystemMod(userId)) forbidden();
+        if (!group.isPublicGroup()) {
+            if (userId == null || userId.isBlank()) {
+                throw new BusinessRuleException(ErrorCode.UNAUTHORIZED, "Vui lòng đăng nhập để xem nội dung nhóm riêng tư");
+            }
+            if (!members.existsByGroupIdAndUserId(group.getId(), userId) && !isSystemMod(userId)) {
+                forbidden();
+            }
+        }
     }
     private User user(String id) {
         User user = users.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));

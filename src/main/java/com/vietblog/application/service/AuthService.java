@@ -44,6 +44,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
     private final ObjectMapper objectMapper;
+    private final SystemSettingsService systemSettingsService;
 
     @Transactional
     public AuthSessionResult login(LoginRequest request) {
@@ -66,6 +67,12 @@ public class AuthService {
 
     @Transactional
     public void register(RegisterRequest request) {
+        if (systemSettingsService != null) {
+            Object allowReg = systemSettingsService.getAll().get("allowRegistration");
+            if (Boolean.FALSE.equals(allowReg)) {
+                throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Hệ thống tạm thời đóng đăng ký tài khoản mới");
+            }
+        }
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         if (request.getPasswordConfirm() != null && !request.getPasswordConfirm().isBlank()
                 && !request.getPassword().equals(request.getPasswordConfirm())) {
