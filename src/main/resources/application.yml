@@ -2,11 +2,11 @@ spring:
   application:
     name: vietblog-backend
 
-  # ── Database ──────────────────────────────
+  # ── Database (PostgreSQL + PostGIS + pgvector) ──
   datasource:
-    url: jdbc:postgresql://localhost:5432/vietblog
-    username: postgres
-    password: 123456
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/vietblog}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -18,11 +18,11 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
-  # ── Redis ─────────────────────────────────
+  # ── Redis 7+ (Distributed Cache + Chat Pub/Sub) ──
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
 
   # ── File Upload ───────────────────────────
   servlet:
@@ -32,24 +32,29 @@ spring:
 
 # ── Server ────────────────────────────────
 server:
-  port: 8080
+  port: ${PORT:8080}
+
+# ── Real-time Chat Redis Pub/Sub ("auto" | "true" | "false") ──
+chat:
+  redis:
+    enabled: ${CHAT_REDIS_ENABLED:auto}
 
 # ── JWT ───────────────────────────────────
 jwt:
-  secret: VietBlog2026SecretKeyForJWTTokenGenerationMustBeAtLeast256Bits
+  secret: ${JWT_SECRET:VietBlog2026SecretKeyForJWTTokenGenerationMustBeAtLeast256Bits}
   access-token-expiration: 86400000   # 24 hours
   refresh-token-expiration: 604800000 # 7 days
 
 # ── CORS ──────────────────────────────────
 cors:
-  allowed-origins: http://localhost:5173,http://localhost:5174,http://localhost:3000
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:3000}
 
 # ── Cloudinary ────────────────────────────
 cloudinary:
-  cloud-name: dan2b8knu
-  api-key: 432231466341726
-  api-secret: xBGOokPoQSU9TBt1ry7OMqWaz_s
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:dan2b8knu}
+  api-key: ${CLOUDINARY_API_KEY:432231466341726}
+  api-secret: ${CLOUDINARY_API_SECRET:xBGOokPoQSU9TBt1ry7OMqWaz_s}
 
 # ── Google OAuth ─────────────────────────
 google:
-  client-id: 806310825796-0j2uirp70vc33q93bjo0ecvns20aveu5.apps.googleusercontent.com
+  client-id: ${GOOGLE_CLIENT_ID:806310825796-0j2uirp70vc33q93bjo0ecvns20aveu5.apps.googleusercontent.com}

@@ -2,6 +2,8 @@ package com.vietblog.application.service;
 
 import com.vietblog.application.dto.post.CreatePostRequest;
 import com.vietblog.application.dto.post.PostResponse;
+import com.vietblog.application.port.CacheGateway;
+import com.vietblog.application.port.SearchIndexGateway;
 import com.vietblog.domain.entity.Category;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
@@ -19,23 +21,29 @@ import com.vietblog.infrastructure.repository.PostRepository;
 import com.vietblog.infrastructure.repository.ReactionRepository;
 import com.vietblog.infrastructure.repository.UserRepository;
 import com.vietblog.infrastructure.security.HtmlSanitizer;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class PostApplicationService {
+    public static final String TRENDING_IDS_CACHE_KEY = "vietblog:cache:trending:ids";
+    private static final Duration TRENDING_TTL = Duration.ofSeconds(60);
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
@@ -47,6 +55,55 @@ public class PostApplicationService {
     private final PostImageFeaturesRepository imageFeatures;
     private final CoverImageIndexer coverImageIndexer;
     private final HtmlSanitizer htmlSanitizer;
+    private final SearchIndexGateway indexGateway;
+    private final CacheGateway cache;
+    private final ObjectMapper json;
+
+    @Autowired
+    public PostApplicationService(
+            PostRepository postRepository,
+            UserRepository userRepository,
+            CategoryRepository categoryRepository,
+            PostDomainService postDomainService,
+            CommentRepository comments,
+            ReactionRepository reactions,
+            BookmarkRepository bookmarks,
+            PostImageFeaturesRepository imageFeatures,
+            CoverImageIndexer coverImageIndexer,
+            HtmlSanitizer htmlSanitizer,
+            SearchIndexGateway indexGateway,
+            CacheGateway cache,
+            ObjectMapper json) {
+        this.postRepository = postRepository;
+        this.userRepository = userRepository;
+        this.categoryRepository = categoryRepository;
+        this.postDomainService = postDomainService;
+        this.comments = comments;
+        this.reactions = reactions;
+        this.bookmarks = bookmarks;
+        this.imageFeatures = imageFeatures;
+        this.coverImageIndexer = coverImageIndexer;
+        this.htmlSanitizer = htmlSanitizer;
+        this.indexGateway = indexGateway != null ? indexGateway : SearchIndexGateway.NOOP;
+        this.cache = cache != null ? cache : CacheGateway.NOOP;
+        this.json = json;
+    }
+
+    public PostApplicationService(
+            PostRepository postRepository,
+            UserRepository userRepository,
+            CategoryRepository categoryRepository,
+            PostDomainService postDomainService,
+            CommentRepository comments,
+            ReactionRepository reactions,
+            BookmarkRepository bookmarks,
+            PostImageFeaturesRepository imageFeatures,
+            CoverImageIndexer coverImageIndexer,
+            HtmlSanitizer htmlSanitizer) {
+        this(postRepository, userRepository, categoryRepository, postDomainService, comments,
+                reactions, bookmarks, imageFeatures, coverImageIndexer, htmlSanitizer,
+                SearchIndexGateway.NOOP, CacheGateway.NOOP, null);
+    }
 
     @Transactional
     public PostResponse createPost(String authorId, CreatePostRequest request) {
@@ -88,8 +145,10 @@ public class PostApplicationService {
         postDomainService.validatePostContent(post);
         postDomainService.calculateTrendingScore(post);
 
-        Post savedPost = postRepository.save(post);
+        Post savedPost = postRepository.saveAndFlush(post);
         syncAuthorAndCategoryCounters(author, category);
+        syncPostSearchIndex(savedPost);
+        evictPostAndCategoryCaches();
         coverImageIndexer.scheduleAfterCommit(savedPost.getId());
 
         return mapPostResponse(savedPost, authorId);
@@ -111,9 +170,44 @@ public class PostApplicationService {
     @Transactional(readOnly = true)
     public List<PostResponse> getTrendingPosts(int limit, String viewerId) {
         validatePage(1, limit);
-        return postRepository.findByStatus(Post.PostStatus.PUBLISHED, Pageable.unpaged())
-                .stream().peek(postDomainService::calculateTrendingScore)
+        if (json != null) {
+            Optional<String> cached = cache.get(TRENDING_IDS_CACHE_KEY);
+            if (cached.isPresent()) {
+                try {
+                    List<String> cachedIds = json.readValue(cached.get(), new TypeReference<List<String>>() {});
+                    if (!cachedIds.isEmpty()) {
+                        List<String> slice = cachedIds.subList(0, Math.min(limit, cachedIds.size()));
+                        Map<String, Post> found = postRepository.findAllById(slice).stream()
+                                .filter(p -> p.getStatus() == Post.PostStatus.PUBLISHED)
+                                .collect(Collectors.toMap(Post::getId, p -> p));
+                        if (found.size() == slice.size()) {
+                            return slice.stream()
+                                    .map(id -> mapPostResponse(found.get(id), viewerId))
+                                    .collect(Collectors.toList());
+                        }
+                    }
+                } catch (RuntimeException ignored) {
+                    cache.evict(TRENDING_IDS_CACHE_KEY);
+                }
+            }
+        }
+
+        List<Post> ranked = postRepository.findByStatus(Post.PostStatus.PUBLISHED, Pageable.unpaged())
+                .stream()
+                .peek(postDomainService::calculateTrendingScore)
                 .sorted(Comparator.comparingDouble(Post::getTrendingScore).reversed().thenComparing(Post::getId))
+                .toList();
+
+        if (json != null && !ranked.isEmpty()) {
+            try {
+                List<String> topIds = ranked.stream().limit(100).map(Post::getId).toList();
+                cache.put(TRENDING_IDS_CACHE_KEY, json.writeValueAsString(topIds), TRENDING_TTL);
+            } catch (RuntimeException ignored) {
+                // fail open
+            }
+        }
+
+        return ranked.stream()
                 .limit(limit)
                 .map(post -> mapPostResponse(post, viewerId))
                 .collect(Collectors.toList());
@@ -128,6 +222,7 @@ public class PostApplicationService {
     public PostResponse getPostById(String id, String viewerId) {
         Post post = postRepository.findLockedById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
+
         if (post.getStatus() != Post.PostStatus.PUBLISHED) {
             boolean isAuthor = viewerId != null && post.getAuthor() != null && post.getAuthor().getId().equals(viewerId);
             boolean isAdminOrMod = viewerId != null && userRepository.findById(viewerId)
@@ -140,6 +235,7 @@ public class PostApplicationService {
             post.setViewsCount(post.getViewsCount() + 1);
             postDomainService.calculateTrendingScore(post);
             postRepository.save(post);
+            cache.evict(TRENDING_IDS_CACHE_KEY);
         }
 
         return mapPostResponse(post, viewerId);
@@ -190,11 +286,13 @@ public class PostApplicationService {
         postDomainService.validatePostContent(post);
         postDomainService.calculateTrendingScore(post);
 
-        Post updatedPost = postRepository.save(post);
+        Post updatedPost = postRepository.saveAndFlush(post);
         syncAuthorAndCategoryCounters(post.getAuthor(), category);
         if (oldCategory != null && !oldCategory.getId().equals(category.getId())) {
             syncCategoryCounter(oldCategory);
         }
+        syncPostSearchIndex(updatedPost);
+        evictPostAndCategoryCaches();
         coverImageIndexer.scheduleAfterCommit(updatedPost.getId());
         return mapPostResponse(updatedPost, userId);
     }
@@ -216,6 +314,7 @@ public class PostApplicationService {
         User author = post.getAuthor();
         Category category = post.getCategory();
 
+        indexGateway.deletePostVectors(id);
         imageFeatures.findById(id).ifPresent(imageFeatures::delete);
         comments.detachForPost(id);
         comments.deleteForPost(id);
@@ -225,6 +324,7 @@ public class PostApplicationService {
         postRepository.flush();
 
         syncAuthorAndCategoryCounters(author, category);
+        evictPostAndCategoryCaches();
     }
 
     @Transactional(readOnly = true)
@@ -283,6 +383,21 @@ public class PostApplicationService {
             category.setPostsCount(catCount);
             categoryRepository.save(category);
         }
+    }
+
+    private void syncPostSearchIndex(Post post) {
+        if (post == null || post.getId() == null) return;
+        if (post.getStatus() == Post.PostStatus.PUBLISHED) {
+            double[] vec = TextAlgorithms.hashedTfIdfVector(SearchApplicationService.searchableText(post));
+            indexGateway.upsertPostTextVector(post.getId(), vec);
+        } else {
+            indexGateway.deletePostVectors(post.getId());
+        }
+    }
+
+    private void evictPostAndCategoryCaches() {
+        cache.evict(TRENDING_IDS_CACHE_KEY);
+        cache.evict(CategoryApplicationService.CATEGORIES_CACHE_KEY);
     }
 
     private static List<String> sanitizeTags(List<String> tags) {

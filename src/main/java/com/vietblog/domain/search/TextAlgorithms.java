@@ -7,6 +7,7 @@ import java.util.stream.IntStream;
 
 /** Small, deterministic lexical algorithms; no pretrained embeddings or language model. */
 public final class TextAlgorithms {
+    public static final int TEXT_VECTOR_DIMENSIONS = 256;
     private static final Pattern TAGS = Pattern.compile("<[^>]*>");
     private static final Pattern WORDS = Pattern.compile("[\\p{L}\\p{N}]+");
     private static final Set<String> POSITIVE = loadWords("/nlp/positive_words.txt", Set.of(
@@ -103,6 +104,67 @@ public final class TextAlgorithms {
         var vectors = vectors(documents, List.of(query));
         var target = vectors.get(documents.size());
         return IntStream.range(0, documents.size()).mapToDouble(i -> cosine(vectors.get(i), target)).toArray();
+    }
+
+    /**
+     * Projects text into a fixed-dimension L2-normalized vector via sublinear TF + signed FNV-1a
+     * feature hashing over unigrams and bigrams so vectors can be stored and queried in pgvector.
+     */
+    public static double[] hashedTfIdfVector(String text) {
+        return hashedTfIdfVector(text, TEXT_VECTOR_DIMENSIONS);
+    }
+
+    public static double[] hashedTfIdfVector(String text, int dimensions) {
+        if (dimensions <= 0) throw new IllegalArgumentException("dimensions must be positive");
+        double[] embedding = new double[dimensions];
+        List<String> filtered = tokens(text).stream().filter(w -> !STOP.contains(w)).toList();
+        if (filtered.isEmpty()) return embedding;
+
+        Map<String, Integer> unigramCounts = new HashMap<>();
+        for (String w : filtered) unigramCounts.merge(w, 1, Integer::sum);
+        for (var entry : unigramCounts.entrySet()) {
+            double weight = 1.0 + Math.log(entry.getValue());
+            accumulateSignedHash(embedding, entry.getKey(), weight);
+        }
+
+        Map<String, Integer> bigramCounts = new HashMap<>();
+        for (int i = 0; i + 1 < filtered.size(); i++) {
+            bigramCounts.merge(filtered.get(i) + "_" + filtered.get(i + 1), 1, Integer::sum);
+        }
+        for (var entry : bigramCounts.entrySet()) {
+            double weight = 0.75 * (1.0 + Math.log(entry.getValue()));
+            accumulateSignedHash(embedding, entry.getKey(), weight);
+        }
+
+        double normSq = 0;
+        for (double v : embedding) normSq += v * v;
+        if (normSq > 0) {
+            double invNorm = 1.0 / Math.sqrt(normSq);
+            for (int i = 0; i < dimensions; i++) embedding[i] *= invNorm;
+        }
+        return embedding;
+    }
+
+    private static void accumulateSignedHash(double[] embedding, String feature, double weight) {
+        long hash = 0xcbf29ce484222325L;
+        for (int i = 0; i < feature.length(); i++) {
+            hash ^= feature.charAt(i);
+            hash *= 0x100000001b3L;
+        }
+        int bucket = (int) Long.remainderUnsigned(hash & 0x7fffffffffffffffL, embedding.length);
+        double sign = ((hash >>> 63) & 1L) == 0L ? 1.0 : -1.0;
+        embedding[bucket] += sign * weight;
+    }
+
+    public static double cosineDense(double[] left, double[] right) {
+        if (left == null || right == null || left.length == 0 || left.length != right.length) return 0;
+        double dot = 0, l2 = 0, r2 = 0;
+        for (int i = 0; i < left.length; i++) {
+            dot += left[i] * right[i];
+            l2 += left[i] * left[i];
+            r2 += right[i] * right[i];
+        }
+        return l2 == 0 || r2 == 0 ? 0 : Math.max(-1.0, Math.min(1.0, dot / Math.sqrt(l2 * r2)));
     }
 
     /** Weighted TextRank with dangling-node redistribution; selected sentences retain source order. */

@@ -1,5 +1,6 @@
 package com.vietblog.application.service;
 
+import com.vietblog.application.port.SearchIndexGateway;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.PostImageFeatures;
 import com.vietblog.domain.search.ImageAlgorithms;
@@ -9,6 +10,7 @@ import com.vietblog.infrastructure.search.SearchFileReader;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Pageable;
@@ -27,10 +29,7 @@ import java.util.stream.Collectors;
 
 /**
  * Extracts Color Histogram (HSV) + Sobel + GLCM feature vectors from post cover images
- * so that "Tìm kiếm bằng hình ảnh" has an index to compare against.
- *
- * Indexing runs on a background thread: publishing a post never waits for, or fails because of,
- * downloading and analysing its cover image.
+ * so that "Tìm kiếm bằng hình ảnh" has an index to compare against (stored in PostgreSQL + pgvector).
  */
 @Service
 public class CoverImageIndexer {
@@ -39,6 +38,7 @@ public class CoverImageIndexer {
     private final PostRepository posts;
     private final PostImageFeaturesRepository index;
     private final SearchFileReader files;
+    private final SearchIndexGateway indexGateway;
     private final TransactionTemplate tx;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "cover-image-indexer");
@@ -46,12 +46,20 @@ public class CoverImageIndexer {
         return thread;
     });
 
+    @Autowired
     public CoverImageIndexer(PostRepository posts, PostImageFeaturesRepository index,
-                             SearchFileReader files, PlatformTransactionManager transactionManager) {
+                             SearchFileReader files, PlatformTransactionManager transactionManager,
+                             SearchIndexGateway indexGateway) {
         this.posts = posts;
         this.index = index;
         this.files = files;
         this.tx = new TransactionTemplate(transactionManager);
+        this.indexGateway = indexGateway != null ? indexGateway : SearchIndexGateway.NOOP;
+    }
+
+    public CoverImageIndexer(PostRepository posts, PostImageFeaturesRepository index,
+                             SearchFileReader files, PlatformTransactionManager transactionManager) {
+        this(posts, index, files, transactionManager, SearchIndexGateway.NOOP);
     }
 
     /** Schedule (re)indexing once the surrounding transaction commits. */
@@ -92,15 +100,17 @@ public class CoverImageIndexer {
             }
             BufferedImage image = files.imageFromUrl(coverUrl);
             if (image == null) return false;
-            String vector = Arrays.stream(ImageAlgorithms.features(image))
+            double[] rawVector = ImageAlgorithms.features(image);
+            String vector = Arrays.stream(rawVector)
                     .mapToObj(Double::toString)
                     .collect(Collectors.joining(","));
             tx.executeWithoutResult(status -> posts.findById(postId).ifPresent(post -> {
                 PostImageFeatures features = index.findById(postId).orElseGet(PostImageFeatures::new);
                 features.setPost(post);
                 features.setFeatures(vector);
-                index.save(features);
+                index.saveAndFlush(features);
             }));
+            indexGateway.upsertPostImageVector(postId, rawVector);
             return true;
         } catch (RuntimeException ex) {
             log.debug("Skipped image indexing for post {}: {}", postId, ex.getMessage());
@@ -111,4 +121,3 @@ public class CoverImageIndexer {
     @PreDestroy
     public void shutdown() { worker.shutdownNow(); }
 }
-

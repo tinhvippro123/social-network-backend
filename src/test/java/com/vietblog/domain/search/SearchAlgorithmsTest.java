@@ -63,6 +63,24 @@ class SearchAlgorithmsTest {
         for (double value : ImageAlgorithms.features(solid(Color.BLACK))) assertThat(value).isFinite();
     }
 
+    @Test void hashedTfIdfVectorProducesNormalizedFixedDimensionEmbeddingForPgvector() {
+        double[] springDoc = TextAlgorithms.hashedTfIdfVector("Xây dựng REST API với Java Spring Boot và PostgreSQL");
+        double[] springQuery = TextAlgorithms.hashedTfIdfVector("Hướng dẫn lập trình Java Spring Boot REST API");
+        double[] cookingDoc = TextAlgorithms.hashedTfIdfVector("Bí quyết nấu phở bò Hà Nội thơm ngon đậm đà");
+
+        assertThat(springDoc).hasSize(TextAlgorithms.TEXT_VECTOR_DIMENSIONS);
+        double normSquared = 0;
+        for (double v : springDoc) normSquared += v * v;
+        assertThat(Math.sqrt(normSquared)).isCloseTo(1.0, within(1e-9));
+
+        assertThat(TextAlgorithms.cosineDense(springDoc, springQuery))
+                .isGreaterThan(0.4)
+                .isGreaterThan(TextAlgorithms.cosineDense(cookingDoc, springQuery));
+
+        double[] emptyVec = TextAlgorithms.hashedTfIdfVector("và của là trong");
+        assertThat(emptyVec).hasSize(TextAlgorithms.TEXT_VECTOR_DIMENSIONS).containsOnly(0.0);
+    }
+
     private static BufferedImage solid(Color color) {
         BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) image.setRGB(x, y, color.getRGB());

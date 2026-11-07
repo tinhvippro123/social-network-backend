@@ -1,5 +1,6 @@
 package com.vietblog.application.service;
 
+import com.vietblog.application.port.CacheGateway;
 import com.vietblog.domain.entity.Notification;
 import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.application.dto.comment.CommentResponse;
@@ -31,6 +32,7 @@ public class CommentApplicationService {
     private final CommentDomainService commentDomainService;
     private final com.vietblog.infrastructure.repository.NotificationRepository notifications;
     private final PostDomainService postDomainService;
+    private final CacheGateway cache;
 
     @Transactional
     public CommentResponse addComment(String postId, String authorId, CreateCommentRequest request) {
@@ -66,6 +68,7 @@ public class CommentApplicationService {
         comment = commentRepository.save(comment);
         post.setCommentsCount(post.getCommentsCount() + 1);
         postDomainService.calculateTrendingScore(post);
+        cache.evict(PostApplicationService.TRENDING_IDS_CACHE_KEY);
         if (parentComment != null && !parentComment.getAuthor().getId().equals(authorId)) {
             notifications.save(Notification.builder()
                     .user(parentComment.getAuthor())
@@ -127,6 +130,7 @@ public class CommentApplicationService {
         commentRepository.flush();
         post.setCommentsCount(Math.toIntExact(commentRepository.countByPostId(post.getId())));
         postDomainService.calculateTrendingScore(post);
+        cache.evict(PostApplicationService.TRENDING_IDS_CACHE_KEY);
     }
 
     @Transactional

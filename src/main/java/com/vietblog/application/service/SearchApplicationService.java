@@ -2,6 +2,7 @@ package com.vietblog.application.service;
 
 import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.application.dto.search.SummaryResponse;
+import com.vietblog.application.port.SearchIndexGateway;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.PostImageFeatures;
 import com.vietblog.domain.exception.BusinessRuleException;
@@ -16,20 +17,28 @@ import com.vietblog.infrastructure.repository.PostImageFeaturesRepository;
 import com.vietblog.infrastructure.repository.SearchCommentRepository;
 import com.vietblog.infrastructure.repository.SearchPostRepository;
 import com.vietblog.infrastructure.search.SearchFileReader;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SearchApplicationService {
     public static final int MAX_CORPUS = 2000;
@@ -38,6 +47,32 @@ public class SearchApplicationService {
     private final SearchCommentRepository comments;
     private final BookmarkRepository bookmarks;
     private final SearchFileReader files;
+    private final SearchIndexGateway indexGateway;
+
+    @Autowired
+    public SearchApplicationService(
+            SearchPostRepository posts,
+            PostImageFeaturesRepository imageIndex,
+            SearchCommentRepository comments,
+            BookmarkRepository bookmarks,
+            SearchFileReader files,
+            SearchIndexGateway indexGateway) {
+        this.posts = posts;
+        this.imageIndex = imageIndex;
+        this.comments = comments;
+        this.bookmarks = bookmarks;
+        this.files = files;
+        this.indexGateway = indexGateway != null ? indexGateway : SearchIndexGateway.NOOP;
+    }
+
+    public SearchApplicationService(
+            SearchPostRepository posts,
+            PostImageFeaturesRepository imageIndex,
+            SearchCommentRepository comments,
+            BookmarkRepository bookmarks,
+            SearchFileReader files) {
+        this(posts, imageIndex, comments, bookmarks, files, SearchIndexGateway.NOOP);
+    }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public Map<String, Long> sentimentStats() {
@@ -52,8 +87,11 @@ public class SearchApplicationService {
         return posts.findByStatusOrderByCreatedAtDescIdAsc(Post.PostStatus.PUBLISHED, PageRequest.of(0, MAX_CORPUS));
     }
 
-    private static String searchableText(Post post) {
-        String value = post.getTitle() + " " + post.getTitle() + " " + Objects.toString(post.getExcerpt(), "") + " " + post.getContent() + " " + String.join(" ", post.getTags());
+    public static String searchableText(Post post) {
+        String tags = post.getTags() == null ? "" : String.join(" ", post.getTags());
+        String value = post.getTitle() + " " + post.getTitle() + " "
+                + Objects.toString(post.getExcerpt(), "") + " "
+                + Objects.toString(post.getContent(), "") + " " + tags;
         return value.substring(0, Math.min(value.length(), 20_000));
     }
 
@@ -69,12 +107,22 @@ public class SearchApplicationService {
     }
 
     private List<PostResponse> textSearch(String query, String type, int limit, String viewerId) {
-        List<Post> corpus = corpus();
+        List<Post> corpus;
+        if ("semantic".equals(type)) {
+            double[] queryVector = TextAlgorithms.hashedTfIdfVector(query);
+            Optional<List<String>> candidateIds = indexGateway.findSemanticCandidateIds(queryVector, Math.max(limit * 5, 100));
+            corpus = candidateIds.filter(ids -> !ids.isEmpty())
+                    .map(posts::findPublishedByIdIn)
+                    .orElseGet(this::corpus);
+        } else {
+            corpus = corpus();
+        }
         if (corpus.isEmpty()) return List.of();
         double[] scores;
         List<String> texts = corpus.stream().map(SearchApplicationService::searchableText).toList();
-        if ("semantic".equals(type)) scores = TextAlgorithms.similarities(texts, query);
-        else {
+        if ("semantic".equals(type)) {
+            scores = TextAlgorithms.similarities(texts, query);
+        } else {
             Set<String> terms = new HashSet<>(TextAlgorithms.tokens(query));
             scores = texts.stream().map(TextAlgorithms::tokens).map(HashSet::new)
                     .mapToDouble(words -> terms.isEmpty() || !words.containsAll(terms) ? 0 : (double) terms.size() / Math.max(1, words.size())).toArray();
@@ -100,7 +148,10 @@ public class SearchApplicationService {
     public List<PostResponse> searchImage(MultipartFile image, int limit, String viewerId) {
         validateLimit(limit);
         double[] query = ImageAlgorithms.features(files.image(image));
-        List<Post> corpus = corpus();
+        Optional<List<String>> candidateIds = indexGateway.findImageCandidateIds(query, Math.max(limit * 3, 50));
+        List<Post> corpus = candidateIds.filter(ids -> !ids.isEmpty())
+                .map(posts::findPublishedByIdIn)
+                .orElseGet(this::corpus);
         if (corpus.isEmpty()) return List.of();
         Map<String, Post> byId = corpus.stream().collect(Collectors.toMap(Post::getId, post -> post));
         Map<String, Double> scores = new HashMap<>();
@@ -118,7 +169,8 @@ public class SearchApplicationService {
         PostImageFeatures index = imageIndex.findById(postId).orElseGet(PostImageFeatures::new);
         index.setPost(post);
         index.setFeatures(Arrays.stream(vector).mapToObj(Double::toString).collect(Collectors.joining(",")));
-        imageIndex.save(index);
+        imageIndex.saveAndFlush(index);
+        indexGateway.upsertPostImageVector(postId, vector);
     }
 
     public List<PostResponse> nearby(double latitude, double longitude, double radiusKm, int limit) {
@@ -129,8 +181,21 @@ public class SearchApplicationService {
         validateLimit(limit);
         if (!Double.isFinite(latitude) || !Double.isFinite(longitude) || !Double.isFinite(radiusKm)
                 || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || radiusKm <= 0 || radiusKm > 500) throw invalid();
+
+        Optional<List<String>> spatialCandidates = indexGateway.findNearbyCandidateIds(latitude, longitude, radiusKm, limit);
+        List<Post> candidates;
+        if (spatialCandidates.isPresent()) {
+            if (spatialCandidates.get().isEmpty()) {
+                return List.of();
+            }
+            candidates = posts.findPublishedByIdIn(spatialCandidates.get());
+        } else {
+            candidates = corpus();
+        }
+
         ToDoubleFunction<Post> distance = post -> GeoAlgorithms.distanceKm(latitude, longitude, post.getLatitude(), post.getLongitude());
-        return corpus().stream().filter(post -> post.getLatitude() != null && post.getLongitude() != null)
+        return candidates.stream()
+                .filter(post -> post.getLatitude() != null && post.getLongitude() != null)
                 .filter(post -> distance.applyAsDouble(post) <= radiusKm)
                 .sorted(Comparator.comparingDouble(distance).thenComparing(Post::getId)).limit(limit)
                 .map(post -> toPostResponse(post, viewerId)).toList();
@@ -167,6 +232,7 @@ public class SearchApplicationService {
         if (fields.length != ImageAlgorithms.DIMENSIONS) return new double[0];
         return Arrays.stream(fields).mapToDouble(Double::parseDouble).toArray();
     }
+
     private static void validateLimit(int limit) { if (limit < 1 || limit > 100) throw invalid(); }
     private static BusinessRuleException invalid() { return new BusinessRuleException(ErrorCode.INVALID_INPUT); }
 }

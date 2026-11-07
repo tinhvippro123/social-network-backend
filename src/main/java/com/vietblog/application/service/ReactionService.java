@@ -1,5 +1,6 @@
 package com.vietblog.application.service;
 
+import com.vietblog.application.port.CacheGateway;
 import com.vietblog.domain.entity.Notification;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.Reaction;
@@ -30,6 +31,7 @@ public class ReactionService {
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
     private final PostDomainService postDomainService;
+    private final CacheGateway cache;
 
     @Transactional
     public void toggleReaction(String postId, String userId, String emoji) {
@@ -92,6 +94,7 @@ public class ReactionService {
 
         postDomainService.calculateTrendingScore(post);
         postRepository.save(post);
+        cache.evict(PostApplicationService.TRENDING_IDS_CACHE_KEY);
     }
 
     @Transactional(readOnly = true)
