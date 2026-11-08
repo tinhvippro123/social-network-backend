@@ -3,8 +3,8 @@
 > Nền tảng chia sẻ bài viết cộng đồng công nghệ Việt Nam. Hệ thống Backend được xây dựng theo kiến trúc **Clean Architecture** (Pragmatic approach) kết hợp **Domain-Driven Design (DDD lite)**.
 
 ## 🚀 Công nghệ sử dụng
-- **Ngôn ngữ:** Java 17
-- **Framework:** Spring Boot 3 (Spring Web, Spring Data JPA, Spring Security)
+- **Ngôn ngữ:** Java 21
+- **Framework:** Spring Boot 4 (Spring Web, Spring Data JPA, Spring Security)
 - **Cơ sở dữ liệu:** PostgreSQL 16+ (PostGIS & pgvector cho AI search)
 - **Caching & Real-time:** Redis (chuẩn bị tích hợp)
 - **Bảo mật:** JWT (JSON Web Token)
@@ -20,9 +20,9 @@ Dự án được phân chia thành 4 lớp cốt lõi để đảm bảo nguyê
 ## 🛠️ Hướng dẫn cài đặt (Local Development)
 
 ### 1. Yêu cầu hệ thống
-- JDK 17
-- PostgreSQL 16
-- Redis (Optional - for future features)
+- JDK 21
+- PostgreSQL 16 (PostGIS & pgvector)
+- Redis 7+
 
 ### 2. Cài đặt Database
 Tạo một database trống trong PostgreSQL:

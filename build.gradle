@@ -10,7 +10,7 @@ description = 'VietBlog Backend API - Nền tảng chia sẻ bài viết cộng 
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
+		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
 
