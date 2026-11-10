@@ -376,7 +376,7 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
                         .content("{\"email\":\"" + newEmail + "\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
-        String otp = objectMapper.readTree(forgotRes.getResponse().getContentAsString()).path("data").path("otp").asText();
+        String otp = objectMapper.readTree(forgotRes.getResponse().getContentAsString()).path("data").path("otp").asString();
         assertThat(otp).hasSize(6);
 
         mvc.perform(post("/api/auth/reset-password")
@@ -428,7 +428,7 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
                                 + "\",\"categoryId\":\"" + category.getId() + "\",\"status\":\"DRAFT\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
-        String peerDraftId = objectMapper.readTree(createDraft.getResponse().getContentAsString()).path("data").path("id").asText();
+        String peerDraftId = objectMapper.readTree(createDraft.getResponse().getContentAsString()).path("data").path("id").asString();
 
         mvc.perform(get("/api/posts/{id}", peerDraftId).cookie(peerCookie)).andExpect(status().isOk());
         mvc.perform(get("/api/posts/{id}", peerDraftId).cookie(authorCookie)).andExpect(status().isNotFound());
@@ -459,7 +459,7 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
                         .content("{\"content\":\"Bình luận thử nghiệm từ Peer\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
-        String cmtId = objectMapper.readTree(newCmt.getResponse().getContentAsString()).path("data").path("id").asText();
+        String cmtId = objectMapper.readTree(newCmt.getResponse().getContentAsString()).path("data").path("id").asString();
 
         // Post author can delete someone else's comment on their own post
         mvc.perform(delete("/api/posts/{id}/comments/{cid}", publishedPost.getId(), cmtId).cookie(authorCookie))
@@ -483,7 +483,7 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
                         .content("{\"participantIds\":[\"" + authorUser.getId() + "\"],\"isGroup\":false}"))
                 .andExpect(status().isOk())
                 .andReturn();
-        String convId = objectMapper.readTree(convRes.getResponse().getContentAsString()).path("data").path("id").asText();
+        String convId = objectMapper.readTree(convRes.getResponse().getContentAsString()).path("data").path("id").asString();
 
         MvcResult msgRes = mvc.perform(post("/api/chat/conversations/{id}/messages", convId)
                         .cookie(peerCookie)
@@ -491,7 +491,7 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
                         .content("{\"content\":\"Xin chào tác giả!\",\"type\":\"text\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
-        String msgId = objectMapper.readTree(msgRes.getResponse().getContentAsString()).path("data").path("id").asText();
+        String msgId = objectMapper.readTree(msgRes.getResponse().getContentAsString()).path("data").path("id").asString();
 
         mvc.perform(post("/api/chat/conversations/{id}/read", convId).cookie(authorCookie)).andExpect(status().isOk());
         mvc.perform(patch("/api/chat/conversations/{id}/pin", convId)
@@ -569,7 +569,7 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
                         .content("{\"targetId\":\"" + publishedPost.getId() + "\",\"type\":\"POST\",\"reason\":\"Kiểm duyệt\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
-        String reportId = objectMapper.readTree(repRes.getResponse().getContentAsString()).path("data").path("id").asText();
+        String reportId = objectMapper.readTree(repRes.getResponse().getContentAsString()).path("data").path("id").asString();
 
         // MODERATOR allowed endpoints
         mvc.perform(get("/api/admin/reports").cookie(modCookie)).andExpect(status().isOk());
@@ -631,7 +631,7 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode catNode = objectMapper.readTree(catRes.getResponse().getContentAsString()).path("data");
-        String newCatId = catNode.path("id").asText();
+        String newCatId = catNode.path("id").asString();
         mvc.perform(put("/api/categories/{id}", newCatId)
                         .cookie(adminCookie)
                         .contentType(MediaType.APPLICATION_JSON)
