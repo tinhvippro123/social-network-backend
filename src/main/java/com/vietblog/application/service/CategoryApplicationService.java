@@ -63,7 +63,7 @@ public class CategoryApplicationService {
         Category category = Category.builder()
                 .name(request.getName().trim())
                 .description(request.getDescription())
-                .icon(request.getIcon() != null && !request.getIcon().isBlank() ? request.getIcon().trim() : "📁")
+                .icon(request.getIcon() != null ? request.getIcon().trim() : "")
                 .build();
 
         categoryDomainService.generateSlug(category);
@@ -130,7 +130,7 @@ public class CategoryApplicationService {
         if (request.getDescription() != null) {
             category.setDescription(request.getDescription());
         }
-        if (request.getIcon() != null && !request.getIcon().isBlank()) {
+        if (request.getIcon() != null) {
             category.setIcon(request.getIcon().trim());
         }
 
