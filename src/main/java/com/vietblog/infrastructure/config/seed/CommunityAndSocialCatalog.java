@@ -106,7 +106,7 @@ public final class CommunityAndSocialCatalog {
                         "CLB Công nghệ Thông tin HCMUNRE",
                         "Không gian sinh hoạt học thuật, chia sẻ kinh nghiệm thực tập doanh nghiệp, nghiên cứu khoa học và kết nối các thế hệ sinh viên Khoa CNTT — Trường Đại học Tài nguyên và Môi trường TP.HCM.",
                         "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=300&q=80",
-                        "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80",
+                        "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=80",
                         "vuquoctuan@gmail.com", true, 24, coreTechMembers,
                         List.of(
                                 new GroupPostSeed("vuquoctuan@gmail.com",

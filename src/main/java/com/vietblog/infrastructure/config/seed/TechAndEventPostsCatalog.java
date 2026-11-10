@@ -398,7 +398,7 @@ public final class TechAndEventPostsCatalog {
                         img("https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=80", "Nhóm sinh viên thảo luận và giới thiệu kiến trúc sản phẩm tại bàn trưng bày"),
                         img("https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=80", "Phiên trao đổi kỹ thuật trực tiếp giữa kỹ sư doanh nghiệp và sinh viên năm cuối"),
                         img("https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=1200&q=80", "Trình diễn trực tiếp các ứng dụng Web, Trí tuệ nhân tạo và Bản đồ số"),
-                        img("https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80", "Không gian khuôn viên trường rực rỡ trong ngày hội học thuật và hướng nghiệp")
+                        img("https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=80", "Không gian khuôn viên trường rực rỡ trong ngày hội học thuật và hướng nghiệp")
                 ) + """
                 <h2>Các hoạt động trọng tâm trong khuôn khổ chương trình</h2>
                 <ul>
