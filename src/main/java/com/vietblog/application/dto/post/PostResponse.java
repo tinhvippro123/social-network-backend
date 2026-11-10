@@ -47,7 +47,6 @@ public class PostResponse {
         private String id;
         private String name;
         private String slug;
-        private String icon;
     }
 
     public static PostResponse fromEntity(Post post) {
@@ -78,7 +77,6 @@ public class PostResponse {
                         .id(post.getCategory().getId())
                         .name(post.getCategory().getName())
                         .slug(post.getCategory().getSlug())
-                        .icon(post.getCategory().getIcon())
                         .build())
                 .tags(post.getTags())
                 .viewsCount(post.getViewsCount())

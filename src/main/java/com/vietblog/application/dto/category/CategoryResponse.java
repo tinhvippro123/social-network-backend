@@ -17,7 +17,6 @@ public class CategoryResponse {
     private String name;
     private String slug;
     private String description;
-    private String icon;
     private int postsCount;
     private LocalDateTime createdAt;
 
@@ -31,7 +30,6 @@ public class CategoryResponse {
                 .name(category.getName())
                 .slug(category.getSlug())
                 .description(category.getDescription())
-                .icon(category.getIcon())
                 .postsCount(postsCount)
                 .createdAt(category.getCreatedAt())
                 .build();

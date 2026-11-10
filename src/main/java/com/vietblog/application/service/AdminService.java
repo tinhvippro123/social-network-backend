@@ -81,11 +81,11 @@ public class AdminService {
 
     private List<AdminDtos.CategoryStat> topCategories() {
         var rows = posts.countByCategory(PageRequest.of(0, 6));
-        long max = rows.stream().mapToLong(r -> ((Number) r[2]).longValue()).max().orElse(0);
+        long max = rows.stream().mapToLong(r -> ((Number) r[1]).longValue()).max().orElse(0);
         return rows.stream().map(r -> {
-            long count = ((Number) r[2]).longValue();
+            long count = ((Number) r[1]).longValue();
             int pct = max == 0 ? 0 : (int) Math.round(count * 100.0 / max);
-            return new AdminDtos.CategoryStat((String) r[0], (String) r[1], count, pct);
+            return new AdminDtos.CategoryStat((String) r[0], count, pct);
         }).toList();
     }
 

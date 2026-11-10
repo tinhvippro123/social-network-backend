@@ -12,7 +12,4 @@ public class CreateCategoryRequest {
 
     @Size(max = 255, message = "Mô tả không được vượt quá 255 ký tự")
     private String description;
-
-    @Size(max = 32, message = "Icon không được vượt quá 32 ký tự")
-    private String icon;
 }

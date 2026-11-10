@@ -80,7 +80,6 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
                 .name("Tech-" + suffix)
                 .slug("tech-" + suffix)
                 .description("Công nghệ phần mềm")
-                .icon("💻")
                 .build());
 
         String longContent = "Kiến trúc Clean Architecture kết hợp Spring Boot 3, PostGIS và pgvector giúp tối ưu hiệu năng truy vấn dữ liệu lớn. ".repeat(3);

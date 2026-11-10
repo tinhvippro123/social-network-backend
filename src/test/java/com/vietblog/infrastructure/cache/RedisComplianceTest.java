@@ -67,7 +67,7 @@ class RedisComplianceTest {
         CacheGateway cache = mock(CacheGateway.class);
         var json = JsonMapper.builder().build();
 
-        Category cat = Category.builder().id("cat-1").name("Trí tuệ nhân tạo").slug("tri-tue-nhan-tao").icon("🤖").build();
+        Category cat = Category.builder().id("cat-1").name("Trí tuệ nhân tạo").slug("tri-tue-nhan-tao").build();
         when(categoryRepo.findAll()).thenReturn(List.of(cat));
         when(postRepo.countByCategoryIdAndStatus(eq("cat-1"), any())).thenReturn(5L);
         when(cache.get(CategoryApplicationService.CATEGORIES_CACHE_KEY)).thenReturn(Optional.empty());

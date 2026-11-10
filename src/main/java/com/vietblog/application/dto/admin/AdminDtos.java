@@ -31,7 +31,7 @@ public final class AdminDtos {
 
     public record PostResponse(String id, String title, String status, String authorId, String authorName,
                                String categoryId, String categoryName, int viewsCount, LocalDateTime createdAt,
-                               String coverImage, String authorAvatar, String categoryIcon,
+                               String coverImage, String authorAvatar,
                                int upvotesCount, int commentsCount, long reportsCount) {
         public static PostResponse from(Post post) {
             return from(post, 0L);
@@ -41,13 +41,13 @@ public final class AdminDtos {
             return new PostResponse(post.getId(), post.getTitle(), post.getStatus().name().toLowerCase(Locale.ROOT),
                     post.getAuthor().getId(), post.getAuthor().getName(), post.getCategory().getId(),
                     post.getCategory().getName(), post.getViewsCount(), post.getCreatedAt(),
-                    post.getCoverImage(), post.getAuthor().getAvatar(), post.getCategory().getIcon(),
+                    post.getCoverImage(), post.getAuthor().getAvatar(),
                     post.getUpvotesCount(), post.getCommentsCount(), reportsCount);
         }
     }
 
     public record DailyGrowth(LocalDate date, long users, long posts) { }
-    public record CategoryStat(String name, String icon, long count, int pct) { }
+    public record CategoryStat(String name, long count, int pct) { }
     /** type: post | user | report — time là thời điểm thật của sự kiện */
     public record Activity(String type, String text, LocalDateTime time) { }
     public record Stats(long totalUsers, long newUsersToday, long totalPosts, long newPostsToday,
