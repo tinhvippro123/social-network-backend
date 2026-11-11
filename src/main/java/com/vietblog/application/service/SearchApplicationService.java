@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -109,29 +110,59 @@ public class SearchApplicationService {
     }
 
     private List<PostResponse> textSearch(String query, String type, int limit, String viewerId) {
-        List<Post> corpus;
-        if ("semantic".equals(type)) {
-            double[] queryVector = TextAlgorithms.hashedTfIdfVector(query);
-            Optional<List<String>> candidateIds = indexGateway.findSemanticCandidateIds(queryVector, Math.max(limit * 5, 100));
-            corpus = candidateIds.filter(ids -> !ids.isEmpty())
-                    .map(posts::findPublishedByIdIn)
-                    .orElseGet(this::corpus);
-        } else {
-            corpus = corpus();
-        }
+        // Unaccented queries ("da lat", "tri tue nhan tao") are matched against diacritic-folded text
+        // so users can search Vietnamese content without typing accents.
+        boolean folded = TextAlgorithms.isUnaccented(query);
+        List<Post> corpus = "semantic".equals(type) ? semanticCorpus(query, limit, folded) : corpus();
         if (corpus.isEmpty()) return List.of();
         double[] scores;
         List<String> texts = corpus.stream().map(SearchApplicationService::searchableText).toList();
         if ("semantic".equals(type)) {
-            scores = TextAlgorithms.similarities(texts, query);
+            scores = folded
+                    ? TextAlgorithms.similarities(texts.stream().map(TextAlgorithms::foldedContent).toList(), TextAlgorithms.foldedContent(query))
+                    : TextAlgorithms.similarities(texts, query);
         } else {
             Set<String> terms = new HashSet<>(TextAlgorithms.tokens(query));
-            scores = texts.stream().map(TextAlgorithms::tokens).map(HashSet::new)
-                    .mapToDouble(words -> terms.isEmpty() || !words.containsAll(terms) ? 0 : (double) terms.size() / Math.max(1, words.size())).toArray();
+            scores = texts.stream().map(text -> keywordScore(terms, TextAlgorithms.tokens(text))).mapToDouble(Double::doubleValue).toArray();
         }
         return IntStream.range(0, corpus.size()).boxed().filter(i -> scores[i] > 0)
                 .sorted(Comparator.<Integer>comparingDouble(i -> scores[i]).reversed().thenComparingInt(i -> i)).limit(limit)
                 .map(i -> toPostResponse(corpus.get(i), viewerId)).toList();
+    }
+
+    private List<Post> semanticCorpus(String query, int limit, boolean folded) {
+        double[] queryVector = TextAlgorithms.hashedTfIdfVector(query);
+        Optional<List<String>> candidateIds = indexGateway.findSemanticCandidateIds(queryVector, Math.max(limit * 5, 100));
+        if (candidateIds.isEmpty() || candidateIds.get().isEmpty()) return corpus();
+        List<Post> candidates = posts.findPublishedByIdIn(candidateIds.get());
+        if (!folded) return candidates;
+        // pgvector embeddings are built from accented text, so an unaccented query may miss relevant
+        // candidates; widen with the recent corpus and let folded TF-IDF re-rank.
+        Map<String, Post> merged = new LinkedHashMap<>();
+        candidates.forEach(p -> merged.put(p.getId(), p));
+        corpus().forEach(p -> merged.putIfAbsent(p.getId(), p));
+        return new ArrayList<>(merged.values());
+    }
+
+    /**
+     * Every query term must occur in the document. Accented terms match exactly; unaccented terms
+     * also match their diacritic-folded form ("da" matches "Đà"). Score favours shorter,
+     * denser documents.
+     */
+    static double keywordScore(Set<String> terms, List<String> documentTokens) {
+        if (terms.isEmpty()) return 0;
+        Set<String> exact = new HashSet<>(documentTokens);
+        Set<String> foldedWords = null;
+        for (String term : terms) {
+            if (exact.contains(term)) continue;
+            if (!TextAlgorithms.isUnaccented(term)) return 0;
+            if (foldedWords == null) {
+                foldedWords = new HashSet<>();
+                for (String word : exact) foldedWords.add(TextAlgorithms.fold(word));
+            }
+            if (!foldedWords.contains(term)) return 0;
+        }
+        return (double) terms.size() / Math.max(1, exact.size());
     }
 
     public List<PostResponse> searchDocument(MultipartFile document, int limit) {

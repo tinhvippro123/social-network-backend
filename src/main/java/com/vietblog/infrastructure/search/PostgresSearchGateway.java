@@ -9,6 +9,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -298,6 +300,7 @@ public class PostgresSearchGateway implements SearchIndexGateway {
                 VALUES (?, CAST(? AS vector))
                 ON CONFLICT (post_id) DO UPDATE SET embedding = EXCLUDED.embedding
                 """;
+        runAfterCommit(() -> {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, postId);
@@ -306,6 +309,7 @@ public class PostgresSearchGateway implements SearchIndexGateway {
         } catch (SQLException ex) {
             log.warn("Could not upsert pgvector text embedding for post {}: {}", postId, ex.getMessage());
         }
+        });
     }
 
     @Override
@@ -314,6 +318,7 @@ public class PostgresSearchGateway implements SearchIndexGateway {
             return;
         }
         String sql = "UPDATE post_image_features SET embedding = CAST(? AS vector) WHERE post_id = ?";
+        runAfterCommit(() -> {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, toVectorLiteral(vector));
@@ -322,6 +327,7 @@ public class PostgresSearchGateway implements SearchIndexGateway {
         } catch (SQLException ex) {
             log.warn("Could not upsert pgvector image embedding for post {}: {}", postId, ex.getMessage());
         }
+        });
     }
 
     @Override
@@ -329,12 +335,32 @@ public class PostgresSearchGateway implements SearchIndexGateway {
         if (!pgvectorEnabled || postId == null) {
             return;
         }
+        runAfterCommit(() -> {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement("DELETE FROM post_text_vectors WHERE post_id = ?")) {
             ps.setString(1, postId);
             ps.executeUpdate();
         } catch (SQLException ex) {
             log.warn("Could not delete pgvector text embedding for post {}: {}", postId, ex.getMessage());
+        }
+        });
+    }
+
+    /**
+     * Vector writes use a separate JDBC connection. When called inside an open Spring transaction,
+     * defer them until after commit so the new connection can see the committed post rows
+     * (avoids FK violations on new posts and row-lock waits on post_image_features).
+     */
+    private static void runAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
         }
     }
 

@@ -17,6 +17,7 @@ public class ModerationService {
     private final PostRepository posts;
     private final UserRepository users;
     private final CategoryRepository categories;
+    private PostApplicationService postApplicationService;
 
     public ModerationService(PostRepository posts) {
         this(posts, null, null);
@@ -27,6 +28,11 @@ public class ModerationService {
         this.posts = posts;
         this.users = users;
         this.categories = categories;
+    }
+
+    @Autowired(required = false)
+    void setPostApplicationService(PostApplicationService postApplicationService) {
+        this.postApplicationService = postApplicationService;
     }
 
     @Transactional
@@ -47,6 +53,7 @@ public class ModerationService {
             post.getCategory().setPostsCount(catCount);
             categories.save(post.getCategory());
         }
+        if (postApplicationService != null) postApplicationService.refreshSearchIndexAndCaches(post);
         return AdminDtos.PostResponse.from(post);
     }
 }

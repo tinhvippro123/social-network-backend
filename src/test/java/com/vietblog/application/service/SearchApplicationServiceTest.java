@@ -35,6 +35,19 @@ class SearchApplicationServiceTest {
         verify(posts, times(3)).findByStatusOrderByCreatedAtDescIdAsc(eq(Post.PostStatus.PUBLISHED), any());
     }
 
+    @Test void unaccentedVietnameseQueriesMatchAccentedPostsInBothModes() {
+        Post dalat = Post.builder().id("dalat").title("Săn mây đồi chè Cầu Đất Đà Lạt").content("Trí tuệ nhân tạo và ẩm thực Việt.")
+                .status(Post.PostStatus.PUBLISHED).author(User.builder().id("owner").name("Author").build())
+                .category(Category.builder().id("travel").name("Du lịch").build()).build();
+        when(posts.findByStatusOrderByCreatedAtDescIdAsc(eq(Post.PostStatus.PUBLISHED), any())).thenReturn(List.of(post, dalat));
+        assertThat(service.search("da lat", "keyword", 10)).extracting("id").containsExactly("dalat");
+        assertThat(service.search("Đà Lạt", "keyword", 10)).extracting("id").containsExactly("dalat");
+        assertThat(service.search("tri tue nhan tao", "semantic", 10)).extracting("id").containsExactly("dalat");
+        assertThat(service.search("ẩm thực", "semantic", 10)).extracting("id").containsExactly("dalat");
+        // Accented query terms stay exact: "Đá" must not match "Đà".
+        assertThat(service.search("Đá Lạt", "keyword", 10)).isEmpty();
+    }
+
     @Test void radiusFiltersByRealDistanceAndRejectsInvalidCoordinates() {
         when(posts.findByStatusOrderByCreatedAtDescIdAsc(eq(Post.PostStatus.PUBLISHED), any())).thenReturn(List.of(post));
         assertThat(service.nearby(0, 0, 100, 10)).isEmpty();

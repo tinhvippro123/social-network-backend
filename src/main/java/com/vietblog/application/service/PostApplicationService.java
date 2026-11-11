@@ -391,6 +391,15 @@ public class PostApplicationService {
         }
     }
 
+    /**
+     * Called by moderation/admin/tag flows that change a post's visibility or searchable text outside
+     * this service, so pgvector embeddings and the trending/category caches never go stale.
+     */
+    public void refreshSearchIndexAndCaches(Post post) {
+        syncPostSearchIndex(post);
+        evictPostAndCategoryCaches();
+    }
+
     private void syncPostSearchIndex(Post post) {
         if (post == null || post.getId() == null) return;
         if (post.getStatus() == Post.PostStatus.PUBLISHED) {

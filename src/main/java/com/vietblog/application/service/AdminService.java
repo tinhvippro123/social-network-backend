@@ -162,6 +162,7 @@ public class AdminService {
         post.setStatus(status);
         Post saved = posts.saveAndFlush(post);
         postApplicationService.syncAuthorAndCategoryCounters(saved.getAuthor(), saved.getCategory());
+        postApplicationService.refreshSearchIndexAndCaches(saved);
         long reportCount = reports != null
                 ? reports.countByTargetIds(Report.TargetType.POST, List.of(saved.getId())).stream()
                         .mapToLong(r -> ((Number) r[1]).longValue()).findFirst().orElse(0L)

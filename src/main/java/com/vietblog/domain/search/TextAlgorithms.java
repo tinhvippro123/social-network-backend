@@ -84,6 +84,34 @@ public final class TextAlgorithms {
         return words;
     }
 
+    private static final Pattern COMBINING_MARKS = Pattern.compile("\\p{M}+");
+
+    /** Removes Vietnamese diacritics (including đ/Đ) and lowercases: "Đà Lạt" -> "da lat". */
+    public static String fold(String text) {
+        if (text == null) return "";
+        String decomposed = Normalizer.normalize(text, Normalizer.Form.NFD);
+        return COMBINING_MARKS.matcher(decomposed).replaceAll("")
+                .replace('đ', 'd').replace('Đ', 'D')
+                .toLowerCase(Locale.ROOT);
+    }
+
+    /** True when the text carries no Vietnamese diacritics, i.e. the user typed an unaccented query. */
+    public static boolean isUnaccented(String text) {
+        String lower = Normalizer.normalize(text == null ? "" : text, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
+        return fold(lower).equals(lower);
+    }
+
+    /** Stop-word filtered, diacritic-folded token stream used for accent-insensitive matching. */
+    public static String foldedContent(String text) {
+        StringBuilder sb = new StringBuilder();
+        for (String word : tokens(text)) {
+            if (STOP.contains(word)) continue;
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(fold(word));
+        }
+        return sb.toString();
+    }
+
     private static Map<String, Double> frequencies(String text) {
         Map<String, Double> result = new HashMap<>();
         for (String word : tokens(text)) if (!STOP.contains(word)) result.merge(word, 1.0, Double::sum);

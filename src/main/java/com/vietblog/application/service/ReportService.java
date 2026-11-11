@@ -41,6 +41,12 @@ public class ReportService {
     private final GroupService groupService;
     private final CategoryRepository categories;
     private final PostDomainService postDomainService;
+    private PostApplicationService postApplicationService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setPostApplicationService(PostApplicationService postApplicationService) {
+        this.postApplicationService = postApplicationService;
+    }
 
     @Transactional
     public ReportDtos.Response create(String userId, ReportDtos.CreateRequest request) {
@@ -192,6 +198,7 @@ public class ReportService {
                         }
                     }
                 }
+                if (postApplicationService != null) postApplicationService.refreshSearchIndexAndCaches(post);
             });
             case COMMENT -> comments.findById(report.getTargetId()).ifPresent(comment -> {
                 Post post = comment.getPost();
