@@ -89,9 +89,11 @@ public class SearchApplicationService {
 
     public static String searchableText(Post post) {
         String tags = post.getTags() == null ? "" : String.join(" ", post.getTags());
+        String locationAddress = Objects.toString(post.getLocationAddress(), "");
         String value = post.getTitle() + " " + post.getTitle() + " "
                 + Objects.toString(post.getExcerpt(), "") + " "
-                + Objects.toString(post.getContent(), "") + " " + tags;
+                + Objects.toString(post.getContent(), "") + " "
+                + tags + " " + locationAddress;
         return value.substring(0, Math.min(value.length(), 20_000));
     }
 

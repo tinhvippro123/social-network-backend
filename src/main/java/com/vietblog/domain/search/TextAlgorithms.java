@@ -33,7 +33,19 @@ public final class TextAlgorithms {
         raw.removeAll(POSITIVE);
         raw.removeAll(NEGATIVE);
         raw.removeAll(NEGATION);
-        raw.removeAll(Set.of("bài", "mới", "lớn", "nhỏ", "cao", "khó", "dễ"));
+        raw.removeAll(Set.of(
+                "ai", "ăn", "anh", "bài", "bán", "bản", "bạn", "bộ", "buổi", "cao", "cấp", "cây",
+                "chơi", "chọn", "chung", "chuyển", "chuyện", "cuộc", "cuối", "cuốn", "dài", "dẫn",
+                "đạt", "đặt", "đầy", "dễ", "điểm", "điều", "dữ", "đủ", "đưa", "dùng", "đúng",
+                "gần", "gặp", "giảm", "giờ", "giữ", "hiểu", "hỏi", "khách", "khó", "loại", "lời",
+                "lớn", "lòng", "lượng", "mang", "mạnh", "mất", "mở", "mới", "mức", "năm", "nặng",
+                "nền", "ngày", "nghe", "nghĩ", "ngôi", "ngồi", "ngọn", "ngọt", "người", "nguồn",
+                "nhà", "nhận", "nhìn", "nhỏ", "nhớ", "nhóm", "nói", "nơi", "nước", "phần", "phía",
+                "pho", "quả", "quận", "quay", "rõ", "sáng", "số", "sớm", "sự", "tấm", "tấn",
+                "tăng", "tạo", "tay", "tên", "tháng", "thanh", "thấp", "thật", "thêm", "thiếu",
+                "thuần", "thường", "tìm", "tin", "tính", "toà", "trả", "tránh", "tuổi", "việc",
+                "vở", "vùng", "vượt", "xa", "xem", "ý"
+        ));
         return Collections.unmodifiableSet(raw);
     }
 

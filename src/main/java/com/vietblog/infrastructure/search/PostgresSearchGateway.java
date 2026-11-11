@@ -146,10 +146,11 @@ public class PostgresSearchGateway implements SearchIndexGateway {
 
     private void backfillMissingTextVectors(Connection conn) throws SQLException {
         String selectSql = """
-                SELECT p.id, p.title, p.excerpt, p.content
+                SELECT p.id, p.title, p.excerpt, p.content,
+                       COALESCE(p.location_address, '') AS location_address,
+                       COALESCE((SELECT string_agg(pt.tag, ' ') FROM post_tags pt WHERE pt.post_id = p.id), '') AS tags
                 FROM posts p
-                LEFT JOIN post_text_vectors v ON v.post_id = p.id
-                WHERE p.status = 'PUBLISHED' AND v.post_id IS NULL
+                WHERE p.status = 'PUBLISHED'
                 """;
         String upsertSql = """
                 INSERT INTO post_text_vectors (post_id, embedding)
@@ -165,7 +166,9 @@ public class PostgresSearchGateway implements SearchIndexGateway {
                 String title = Objects.toString(rs.getString("title"), "");
                 String excerpt = Objects.toString(rs.getString("excerpt"), "");
                 String content = Objects.toString(rs.getString("content"), "");
-                String combined = title + " " + title + " " + excerpt + " " + content;
+                String locationAddress = Objects.toString(rs.getString("location_address"), "");
+                String tags = Objects.toString(rs.getString("tags"), "");
+                String combined = title + " " + title + " " + excerpt + " " + content + " " + tags + " " + locationAddress;
                 if (combined.length() > 20_000) {
                     combined = combined.substring(0, 20_000);
                 }

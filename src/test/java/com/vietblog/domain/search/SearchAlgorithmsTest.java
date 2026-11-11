@@ -19,6 +19,9 @@ class SearchAlgorithmsTest {
     @Test void normalizesVietnameseUnicodeAndIgnoresMarkup() {
         assertThat(TextAlgorithms.tokens("<p>TỐT</p><script>bad()</script>")).containsExactly("tốt");
         assertThat(TextAlgorithms.similarities(List.of("<b>lập trình</b> Java"), "lập trình")[0]).isPositive();
+        assertThat(TextAlgorithms.similarities(List.of("Ứng dụng Trí tuệ nhân tạo AI trong Web"), "AI")[0]).isPositive();
+        double[] aiVec = TextAlgorithms.hashedTfIdfVector("AI");
+        assertThat(TextAlgorithms.cosineDense(aiVec, aiVec)).isCloseTo(1.0, within(1e-9));
     }
 
     @Test void textRankKeepsOriginalOrderAndHandlesDisconnectedSentences() {
