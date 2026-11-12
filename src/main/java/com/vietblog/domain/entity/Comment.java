@@ -29,12 +29,13 @@ public class Comment {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Post post;
 
-    // Self-referencing cho reply lá»“ng nhau
+    // Self-referencing cho reply lồng nhau
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
     private Comment parent;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdAt ASC")
     @Builder.Default
     private List<Comment> replies = new ArrayList<>();
 

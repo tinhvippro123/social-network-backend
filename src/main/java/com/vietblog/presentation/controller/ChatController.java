@@ -44,9 +44,19 @@ public class ChatController {
     public ApiResponse<Void> mute(@PathVariable String id, @AuthenticationPrincipal UserPrincipal user, @RequestBody FlagRequest request) {
         service.preference(id, user.getId(), "mute", request.value()); return ok(null);
     }
+    @PatchMapping("/conversations/{id}/nickname")
+    public ApiResponse<Void> updateNickname(@PathVariable String id, @AuthenticationPrincipal UserPrincipal user,
+            @Valid @RequestBody NicknameRequest request) {
+        service.setNickname(id, user.getId(), request.targetUserId(), request.nickname());
+        return ok(null);
+    }
     @DeleteMapping("/conversations/{id}")
     public ApiResponse<Void> hide(@PathVariable String id, @AuthenticationPrincipal UserPrincipal user) {
         service.preference(id, user.getId(), "hide", true); return ok(null);
+    }
+    @GetMapping("/blocks")
+    public ApiResponse<List<com.vietblog.application.dto.community.CommunityDtos.PublicUser>> blockedUsers(@AuthenticationPrincipal UserPrincipal user) {
+        return ok(service.blockedUsers(user.getId()));
     }
     @PostMapping("/blocks/{userId}")
     public ApiResponse<Void> block(@PathVariable String userId, @AuthenticationPrincipal UserPrincipal user) {

@@ -65,7 +65,7 @@ class PostInteractionIntegrationTest extends VietblogBackendApplicationTests {
         mvc.perform(post("/api/posts/{id}/bookmarks", post.getId()).header("Authorization", bearer)).andExpect(status().isOk());
         mvc.perform(get("/api/bookmarks").header("Authorization", bearer)).andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(post.getId()));
         mvc.perform(get("/api/bookmarks")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/posts/{id}/bookmarks/check", post.getId())).andExpect(status().is4xxClientError());
+        mvc.perform(get("/api/posts/{id}/bookmarks/check", post.getId())).andExpect(status().isOk()).andExpect(jsonPath("$.data").value(false));
         post.setStatus(Post.PostStatus.HIDDEN);
         mvc.perform(get("/api/bookmarks").header("Authorization", bearer)).andExpect(jsonPath("$.data").isEmpty());
     }

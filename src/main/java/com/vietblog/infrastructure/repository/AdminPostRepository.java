@@ -21,6 +21,17 @@ public interface AdminPostRepository extends JpaRepository<Post, String> {
 
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime from, LocalDateTime to);
 
+    long countByAuthorId(String authorId);
+
     @Query("select coalesce(sum(p.viewsCount), 0) from Post p")
     long countTotalViews();
+
+    /** [name, count] — số bài đã đăng theo danh mục, giảm dần */
+    @Query("select c.name, count(p) from Post p join p.category c " +
+            "where p.status = com.vietblog.domain.entity.Post.PostStatus.PUBLISHED " +
+            "group by c.id, c.name order by count(p) desc")
+    java.util.List<Object[]> countByCategory(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"author"})
+    java.util.List<Post> findTop5ByOrderByCreatedAtDesc();
 }

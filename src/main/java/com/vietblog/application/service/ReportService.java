@@ -13,10 +13,13 @@ import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.infrastructure.repository.AdminPostRepository;
 import com.vietblog.infrastructure.repository.AdminUserRepository;
+import com.vietblog.infrastructure.repository.CategoryRepository;
 import com.vietblog.infrastructure.repository.CommentRepository;
-import com.vietblog.infrastructure.repository.ReportRepository;
-import com.vietblog.infrastructure.repository.GroupRepository;
 import com.vietblog.infrastructure.repository.GroupMemberRepository;
+import com.vietblog.infrastructure.repository.GroupRepository;
+import com.vietblog.infrastructure.repository.NotificationRepository;
+import com.vietblog.infrastructure.repository.ReportRepository;
+import com.vietblog.domain.service.PostDomainService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,29 +35,36 @@ public class ReportService {
     private final AdminUserRepository users;
     private final AdminPostRepository posts;
     private final CommentRepository comments;
-    private final com.vietblog.infrastructure.repository.NotificationRepository notifications;
+    private final NotificationRepository notifications;
     private final GroupRepository groups;
     private final GroupMemberRepository groupMembers;
     private final GroupService groupService;
+    private final CategoryRepository categories;
+    private final PostDomainService postDomainService;
+    private PostApplicationService postApplicationService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setPostApplicationService(PostApplicationService postApplicationService) {
+        this.postApplicationService = postApplicationService;
+    }
 
     @Transactional
     public ReportDtos.Response create(String userId, ReportDtos.CreateRequest request) {
-        // Serialize submissions by one reporter so simultaneous duplicate requests cannot create two pending reports.
         User reporter = users.findLockedById(userId).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
-        String title = targetTitle(request.type(), request.targetId(), userId);
+        String title = targetTitle(request.type(), request.targetId(), userId, request.reason());
         if (reports.existsByReporterIdAndTargetIdAndTypeAndStatus(userId, request.targetId(), request.type(), Report.ReportStatus.PENDING)) {
             throw new BusinessRuleException(ErrorCode.REPORT_ALREADY_PENDING);
         }
         Report report = Report.builder().reporter(reporter).targetId(request.targetId()).type(request.type())
                 .targetTitle(title).reason(request.reason().trim()).description(request.description()).build();
-        return ReportDtos.Response.from(reports.save(report));
+        return toResponse(reports.save(report));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     @Transactional(readOnly = true)
     public Page<ReportDtos.Response> list(Report.ReportStatus status, int page, int limit) {
         var pageable = AdminService.page(page, limit, "createdAt");
-        return (status == null ? reports.findAll(pageable) : reports.findByStatus(status, pageable)).map(ReportDtos.Response::from);
+        return (status == null ? reports.findAll(pageable) : reports.findByStatus(status, pageable)).map(this::toResponse);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
@@ -67,7 +77,15 @@ public class ReportService {
             case DELETE -> removeTarget(report, actor);
             case BAN -> banTarget(report, actor);
         }
-        return finish(report, actor, Report.ReportStatus.RESOLVED, action.name());
+        ReportDtos.Response res = finish(report, actor, Report.ReportStatus.RESOLVED, action.name());
+        if (action == ReportDtos.Action.DELETE || action == ReportDtos.Action.BAN) {
+            for (Report dup : reports.findByTypeAndTargetIdAndStatus(report.getType(), report.getTargetId(), Report.ReportStatus.PENDING)) {
+                if (!dup.getId().equals(report.getId())) {
+                    finish(dup, actor, Report.ReportStatus.RESOLVED, action.name());
+                }
+            }
+        }
+        return res;
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
@@ -90,24 +108,54 @@ public class ReportService {
         report.setResolvedBy(actor);
         report.setResolvedAt(LocalDateTime.now());
         reports.save(report);
+        String statusLabel = status == Report.ReportStatus.RESOLVED ? "Đã xử lý" : "Đã từ chối";
         notifications.save(Notification.builder().user(report.getReporter()).type(Notification.NotificationType.REPORT)
-                .message("Your report has been reviewed: " + status.name().toLowerCase(java.util.Locale.ROOT)).link("/notifications").build());
-        return ReportDtos.Response.from(report);
+                .message("Báo cáo của bạn đã được bộ phận kiểm duyệt xem xét: " + statusLabel).link("/notifications").build());
+        return toResponse(report);
     }
 
-    private String targetTitle(Report.TargetType type, String id, String userId) {
+    private ReportDtos.Response toResponse(Report report) {
+        String targetPostId = null;
+        if (report.getType() == Report.TargetType.POST) {
+            targetPostId = report.getTargetId();
+        } else if (report.getType() == Report.TargetType.COMMENT) {
+            targetPostId = comments.findById(report.getTargetId()).map(c -> c.getPost().getId()).orElse(null);
+        }
+        return ReportDtos.Response.from(report, targetPostId);
+    }
+
+    private String targetTitle(Report.TargetType type, String id, String userId, String reason) {
         return switch (type) {
-            case POST -> publishedPost(id).getTitle();
+            case POST -> {
+                Post post = publishedPost(id);
+                if (post.getAuthor() != null && userId.equals(post.getAuthor().getId())) {
+                    throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Bạn không thể tự báo cáo bài viết của chính mình");
+                }
+                yield post.getTitle();
+            }
             case COMMENT -> {
                 Comment comment = comment(id);
                 if (comment.getPost().getStatus() != Post.PostStatus.PUBLISHED) throw new ResourceNotFoundException(ErrorCode.COMMENT_NOT_FOUND);
+                if (comment.getAuthor() != null && userId.equals(comment.getAuthor().getId())) {
+                    throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Bạn không thể tự báo cáo bình luận của chính mình");
+                }
                 yield comment.getContent().substring(0, Math.min(255, comment.getContent().length()));
             }
-            case USER -> users.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND)).getName();
+            case USER -> {
+                User targetUser = users.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+                boolean isAccountRequest = reason != null && reason.trim().startsWith("Yêu cầu ");
+                if (userId != null && userId.equals(id) && !isAccountRequest) {
+                    throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Bạn không thể tự báo cáo tài khoản của chính mình");
+                }
+                yield targetUser.getName();
+            }
             case GROUP -> {
                 Group group = group(id);
                 if (!group.isPublicGroup() && !groupMembers.existsByGroupIdAndUserId(id, userId)) {
                     throw new ForbiddenException(ErrorCode.FORBIDDEN);
+                }
+                if (group.getOwner() != null && userId.equals(group.getOwner().getId())) {
+                    throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Bạn không thể tự báo cáo nhóm của chính mình");
                 }
                 yield group.getName();
             }
@@ -134,35 +182,56 @@ public class ReportService {
 
     private void removeTarget(Report report, User actor) {
         switch (report.getType()) {
-            case POST -> {
-                Post post = post(report.getTargetId());
+            case POST -> posts.findById(report.getTargetId()).ifPresent(post -> {
+                boolean wasPublished = post.getStatus() == Post.PostStatus.PUBLISHED;
                 post.setStatus(Post.PostStatus.HIDDEN);
                 posts.save(post);
-            }
-            case COMMENT -> {
-                Comment comment = comment(report.getTargetId());
+                if (wasPublished) {
+                    if (post.getAuthor() != null) {
+                        post.getAuthor().setPostsCount(Math.max(0, post.getAuthor().getPostsCount() - 1));
+                        users.save(post.getAuthor());
+                    }
+                    if (post.getCategory() != null) {
+                        post.getCategory().setPostsCount(Math.max(0, post.getCategory().getPostsCount() - 1));
+                        if (categories != null) {
+                            categories.save(post.getCategory());
+                        }
+                    }
+                }
+                if (postApplicationService != null) postApplicationService.refreshSearchIndexAndCaches(post);
+            });
+            case COMMENT -> comments.findById(report.getTargetId()).ifPresent(comment -> {
                 Post post = comment.getPost();
                 comments.delete(comment);
                 comments.flush();
-                post.setCommentsCount(Math.toIntExact(comments.countByPostId(post.getId())));
-                posts.save(post);
-            }
+                if (post != null) {
+                    post.setCommentsCount(Math.toIntExact(comments.countByPostId(post.getId())));
+                    if (postDomainService != null) {
+                        postDomainService.calculateTrendingScore(post);
+                    }
+                    posts.save(post);
+                }
+            });
             case GROUP -> {
                 if (actor.getRole() != User.Role.ADMIN) throw new ForbiddenException(ErrorCode.FORBIDDEN);
-                groupService.delete(report.getTargetId(), actor.getId());
+                if (groups.existsById(report.getTargetId())) {
+                    groupService.delete(report.getTargetId(), actor.getId());
+                }
             }
-            case USER -> throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+            case USER -> banTarget(report, actor);
         }
     }
 
     private void banTarget(Report report, User actor) {
         String targetUserId = switch (report.getType()) {
-            case POST -> post(report.getTargetId()).getAuthor().getId();
-            case COMMENT -> comment(report.getTargetId()).getAuthor().getId();
+            case POST -> posts.findById(report.getTargetId()).map(p -> p.getAuthor().getId()).orElse(null);
+            case COMMENT -> comments.findById(report.getTargetId()).map(c -> c.getAuthor().getId()).orElse(null);
             case USER -> report.getTargetId();
-            case GROUP -> group(report.getTargetId()).getOwner().getId();
+            case GROUP -> groups.findById(report.getTargetId()).map(g -> g.getOwner().getId()).orElse(null);
         };
-        User target = users.findLockedById(targetUserId).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+        if (targetUserId == null) return;
+        User target = users.findLockedById(targetUserId).orElse(null);
+        if (target == null) return;
         if (target.getId().equals(actor.getId()) || target.getRole() == User.Role.ADMIN
                 || (actor.getRole() == User.Role.MODERATOR && target.getRole() != User.Role.USER)) {
             throw new ForbiddenException(ErrorCode.PROTECTED_ADMIN_ACCOUNT);

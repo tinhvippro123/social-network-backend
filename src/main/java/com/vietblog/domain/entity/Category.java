@@ -20,8 +20,6 @@ public class Category {
     private String slug;
 
     private String description;
-    
-    private String icon;
 
     @Builder.Default
     private int postsCount = 0;

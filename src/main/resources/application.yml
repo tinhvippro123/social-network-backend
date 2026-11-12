@@ -2,27 +2,38 @@ spring:
   application:
     name: vietblog-backend
 
-  # ── Database ──────────────────────────────
+  # ── Database (PostgreSQL + PostGIS + pgvector) ──
   datasource:
-    url: jdbc:postgresql://localhost:5432/vietblog
-    username: postgres
-    password: 123456
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/vietblog}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN:2}
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      keepalive-time: 300000
+      connection-timeout: 30000
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${JPA_DDL_AUTO:update}
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
-  # ── Redis ─────────────────────────────────
+  # ── Redis 7+ (Distributed Cache + Chat Pub/Sub) ──
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      username: ${SPRING_DATA_REDIS_USERNAME:}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      ssl:
+        enabled: ${SPRING_DATA_REDIS_SSL:false}
 
   # ── File Upload ───────────────────────────
   servlet:
@@ -32,20 +43,37 @@ spring:
 
 # ── Server ────────────────────────────────
 server:
-  port: 8080
+  port: ${PORT:8080}
+
+# ── Real-time Chat Redis Pub/Sub ("auto" | "true" | "false") ──
+chat:
+  redis:
+    enabled: ${CHAT_REDIS_ENABLED:auto}
 
 # ── JWT ───────────────────────────────────
 jwt:
-  secret: VietBlog2026SecretKeyForJWTTokenGenerationMustBeAtLeast256Bits
+  secret: ${JWT_SECRET:VietBlog2026SecretKeyForJWTTokenGenerationMustBeAtLeast256Bits}
   access-token-expiration: 86400000   # 24 hours
   refresh-token-expiration: 604800000 # 7 days
+  ws-ticket-expiration: ${JWT_WS_TICKET_EXPIRATION:3600000} # 1 hour
+  cookie:
+    access-name: ${JWT_ACCESS_COOKIE_NAME:vietblog_access_token}
+    refresh-name: ${JWT_REFRESH_COOKIE_NAME:vietblog_refresh_token}
+    status-name: ${JWT_STATUS_COOKIE_NAME:vietblog_logged_in}
+    secure: ${JWT_COOKIE_SECURE:false}
+    same-site: ${JWT_COOKIE_SAME_SITE:Lax}
+    domain: ${JWT_COOKIE_DOMAIN:}
 
 # ── CORS ──────────────────────────────────
 cors:
-  allowed-origins: http://localhost:5173,http://localhost:3000
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:3000}
 
 # ── Cloudinary ────────────────────────────
 cloudinary:
-  cloud-name: dan2b8knu
-  api-key: YOUR_API_KEY_HERE
-  api-secret: YOUR_API_SECRET_HERE
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:dan2b8knu}
+  api-key: ${CLOUDINARY_API_KEY:432231466341726}
+  api-secret: ${CLOUDINARY_API_SECRET:xBGOokPoQSU9TBt1ry7OMqWaz_s}
+
+# ── Google OAuth ─────────────────────────
+google:
+  client-id: ${GOOGLE_CLIENT_ID:806310825796-0j2uirp70vc33q93bjo0ecvns20aveu5.apps.googleusercontent.com}

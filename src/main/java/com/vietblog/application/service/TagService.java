@@ -14,7 +14,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TagService {
     private final TagRepository tags;
+    private PostApplicationService postApplicationService;
     public record TagResponse(String name, long postsCount) { }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setPostApplicationService(PostApplicationService postApplicationService) {
+        this.postApplicationService = postApplicationService;
+    }
 
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
@@ -26,6 +32,7 @@ public class TagService {
             var updated = post.getTags().stream().map(tag -> tag.equals(name) ? replacement.trim() : tag).distinct().toList();
             post.getTags().clear();
             post.getTags().addAll(updated);
+            refresh(post);
         }
         return posts.size();
     }
@@ -34,14 +41,22 @@ public class TagService {
     @Transactional
     public int delete(String name) {
         var posts = tags.findTagged(name);
-        posts.forEach(post -> post.getTags().removeIf(name::equals));
+        posts.forEach(post -> {
+            post.getTags().removeIf(name::equals);
+            refresh(post);
+        });
         return posts.size();
+    }
+
+    private void refresh(com.vietblog.domain.entity.Post post) {
+        if (postApplicationService != null) postApplicationService.refreshSearchIndexAndCaches(post);
     }
 
     @Transactional(readOnly = true)
     public List<TagResponse> list(String search, int limit) {
-        if (limit < 1 || limit > 100 || search.length() > 100) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
-        return tags.findPopular(search.trim(), PageRequest.of(0, limit)).stream()
+        String q = search == null ? "" : search.trim();
+        if (limit < 1 || limit > 100 || q.length() > 100) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        return tags.findPopular(q, PageRequest.of(0, limit)).stream()
                 .map(tag -> new TagResponse(tag.getName(), tag.getPostsCount())).toList();
     }
 }

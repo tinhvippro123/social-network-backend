@@ -3,6 +3,7 @@ package com.vietblog.application.service;
 import com.vietblog.application.dto.report.ReportDtos;
 import com.vietblog.domain.entity.*;
 import com.vietblog.domain.exception.*;
+import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.infrastructure.repository.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,8 @@ class ReportServiceTest {
     @Mock GroupRepository groups;
     @Mock GroupMemberRepository groupMembers;
     @Mock GroupService groupService;
+    @Mock CategoryRepository categories;
+    @Mock PostDomainService postDomainService;
     @InjectMocks ReportService service;
 
     private final User reporter = User.builder().id("reporter").name("Reporter").build();

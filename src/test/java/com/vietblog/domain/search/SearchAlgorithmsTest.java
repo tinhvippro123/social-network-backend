@@ -19,6 +19,9 @@ class SearchAlgorithmsTest {
     @Test void normalizesVietnameseUnicodeAndIgnoresMarkup() {
         assertThat(TextAlgorithms.tokens("<p>TỐT</p><script>bad()</script>")).containsExactly("tốt");
         assertThat(TextAlgorithms.similarities(List.of("<b>lập trình</b> Java"), "lập trình")[0]).isPositive();
+        assertThat(TextAlgorithms.similarities(List.of("Ứng dụng Trí tuệ nhân tạo AI trong Web"), "AI")[0]).isPositive();
+        double[] aiVec = TextAlgorithms.hashedTfIdfVector("AI");
+        assertThat(TextAlgorithms.cosineDense(aiVec, aiVec)).isCloseTo(1.0, within(1e-9));
     }
 
     @Test void textRankKeepsOriginalOrderAndHandlesDisconnectedSentences() {
@@ -34,8 +37,18 @@ class SearchAlgorithmsTest {
         assertThat(TextAlgorithms.sentiment("Bài viết rất tốt và hay").label()).isEqualTo("positive");
         assertThat(TextAlgorithms.sentiment("không tốt").label()).isEqualTo("negative");
         assertThat(TextAlgorithms.sentiment("not bad").label()).isEqualTo("positive");
+        assertThat(TextAlgorithms.sentiment("ngu").label()).isEqualTo("negative");
+        assertThat(TextAlgorithms.sentiment("không ngu").label()).isEqualTo("positive");
         assertThat(TextAlgorithms.sentiment("Java version 17").score()).isZero();
     }
+
+    @Test void loadsExternalLexiconsCorrectly() {
+        assertThat(TextAlgorithms.sentiment("Dịch vụ tuyệt vời và xuất sắc").label()).isEqualTo("positive");
+        assertThat(TextAlgorithms.sentiment("Hành vi lừa đảo và rất mất dạy").label()).isEqualTo("negative");
+        assertThat(TextAlgorithms.sentiment("không lừa đảo").label()).isEqualTo("positive");
+        assertThat(TextAlgorithms.sentiment("lồn").label()).isEqualTo("negative");
+    }
+
 
     @Test void haversineHandlesAntimeridianAndKnownDistance() {
         assertThat(GeoAlgorithms.distanceKm(0, 0, 0, 1)).isCloseTo(111.195, within(0.01));
@@ -51,6 +64,24 @@ class SearchAlgorithmsTest {
         assertThat(ImageAlgorithms.cosine(red, red)).isCloseTo(1, within(1e-10));
         assertThat(ImageAlgorithms.cosine(red, blue)).isLessThan(0.1);
         for (double value : ImageAlgorithms.features(solid(Color.BLACK))) assertThat(value).isFinite();
+    }
+
+    @Test void hashedTfIdfVectorProducesNormalizedFixedDimensionEmbeddingForPgvector() {
+        double[] springDoc = TextAlgorithms.hashedTfIdfVector("Xây dựng REST API với Java Spring Boot và PostgreSQL");
+        double[] springQuery = TextAlgorithms.hashedTfIdfVector("Hướng dẫn lập trình Java Spring Boot REST API");
+        double[] cookingDoc = TextAlgorithms.hashedTfIdfVector("Bí quyết nấu phở bò Hà Nội thơm ngon đậm đà");
+
+        assertThat(springDoc).hasSize(TextAlgorithms.TEXT_VECTOR_DIMENSIONS);
+        double normSquared = 0;
+        for (double v : springDoc) normSquared += v * v;
+        assertThat(Math.sqrt(normSquared)).isCloseTo(1.0, within(1e-9));
+
+        assertThat(TextAlgorithms.cosineDense(springDoc, springQuery))
+                .isGreaterThan(0.4)
+                .isGreaterThan(TextAlgorithms.cosineDense(cookingDoc, springQuery));
+
+        double[] emptyVec = TextAlgorithms.hashedTfIdfVector("và của là trong");
+        assertThat(emptyVec).hasSize(TextAlgorithms.TEXT_VECTOR_DIMENSIONS).containsOnly(0.0);
     }
 
     private static BufferedImage solid(Color color) {

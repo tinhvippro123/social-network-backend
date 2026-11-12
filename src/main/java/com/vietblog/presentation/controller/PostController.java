@@ -24,7 +24,7 @@ public class PostController {
     public ResponseEntity<ApiResponse<PostResponse>> createPost(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @Valid @RequestBody CreatePostRequest request) {
-            
+
         PostResponse response = postApplicationService.createPost(currentUser.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(response, "Tạo bài viết thành công"));
     }
@@ -35,22 +35,19 @@ public class PostController {
             @RequestParam(defaultValue = "10") int limit,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "latest") String sort) {
-            
-        if ("trending".equalsIgnoreCase(sort)) {
-            List<PostResponse> trending = postApplicationService.getTrendingPosts(limit);
-            return ResponseEntity.ok(ApiResponse.success(trending, "Lấy danh sách thịnh hành thành công"));
-        }
+            @RequestParam(defaultValue = "latest") String sort,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
 
-        Page<PostResponse> postPage = postApplicationService.feed(page, limit, category, search);
-        
+        String viewerId = currentUser != null ? currentUser.getId() : null;
+        Page<PostResponse> postPage = postApplicationService.feed(page, limit, category, search, viewerId, sort);
+
         ApiResponse.Meta meta = new ApiResponse.Meta(page, limit, postPage.getTotalElements(), postPage.getTotalPages());
         ApiResponse<List<PostResponse>> response = ApiResponse.success(postPage.getContent(), "Lấy danh sách bài viết thành công");
         response.setMeta(meta);
-        
+
         return ResponseEntity.ok(response);
     }
-    
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<PostResponse>> getPostById(@PathVariable String id,
             @AuthenticationPrincipal UserPrincipal user) {
@@ -76,7 +73,10 @@ public class PostController {
     }
 
     @GetMapping("/trending")
-    public ResponseEntity<ApiResponse<List<PostResponse>>> trending(@RequestParam(defaultValue = "10") int limit) {
-        return ResponseEntity.ok(ApiResponse.success(postApplicationService.getTrendingPosts(limit), "Trending posts retrieved"));
+    public ResponseEntity<ApiResponse<List<PostResponse>>> trending(
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        String viewerId = currentUser != null ? currentUser.getId() : null;
+        return ResponseEntity.ok(ApiResponse.success(postApplicationService.getTrendingPosts(limit, viewerId), "Trending posts retrieved"));
     }
 }

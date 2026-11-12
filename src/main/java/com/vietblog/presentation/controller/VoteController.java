@@ -24,4 +24,14 @@ public class VoteController {
         reactions.toggleReaction(postId, user.getId(), "DOWNVOTE");
         return ApiResponse.success(null, "Vote updated");
     }
+
+    @GetMapping("/vote")
+    public ApiResponse<String> getUserVote(@PathVariable String postId, @AuthenticationPrincipal UserPrincipal user) {
+        if (user == null) {
+            return ApiResponse.success(null, "Unauthenticated");
+        }
+        String reaction = reactions.getUserReaction(postId, user.getId());
+        String vote = ("UPVOTE".equals(reaction) || "DOWNVOTE".equals(reaction)) ? reaction : null;
+        return ApiResponse.success(vote, "User vote fetched");
+    }
 }

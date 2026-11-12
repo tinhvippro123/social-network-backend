@@ -41,8 +41,12 @@ public class ChatService {
         Set<String> ids = new TreeSet<>(request.participantIds());
         ids.add(userId);
         if (ids.size() < 2 || ids.size() > 50 || (!request.isGroup() && ids.size() != 2)) invalid();
-        if (request.isGroup() && (request.name() == null || request.name().isBlank())) invalid();
         List<User> participants = ids.stream().map(this::user).toList();
+        String resolvedName = request.name();
+        if (request.isGroup() && (resolvedName == null || resolvedName.isBlank())) {
+            String joinedNames = participants.stream().map(User::getName).reduce((a, b) -> a + ", " + b).orElse("Nhóm chat");
+            resolvedName = "Nhóm: " + (joinedNames.length() > 80 ? joinedNames.substring(0, 80) : joinedNames);
+        }
         String directKey = request.isGroup() ? null : String.join(":", ids);
         if (!request.isGroup()) {
             requireUnblocked(participants.get(0).getId(), participants.get(1).getId());
@@ -55,7 +59,7 @@ public class ChatService {
                 return conversation(existing.get(), membership);
             }
         }
-        Conversation conversation = conversations.save(Conversation.builder().creator(creator).name(request.name())
+        Conversation conversation = conversations.save(Conversation.builder().creator(creator).name(resolvedName)
                 .groupChat(request.isGroup()).directKey(directKey).build());
         for (User participant : participants) members.save(ConversationMember.builder().conversation(conversation).user(participant).build());
         for (ConversationMember recipient : members.findByConversationId(conversation.getId())) {
@@ -125,6 +129,22 @@ public class ChatService {
         }
     }
 
+    public void setNickname(String id, String userId, String targetUserId, String nickname) {
+        member(id, userId);
+        List<ConversationMember> participants = members.findByConversationId(id);
+        String target = (targetUserId != null && !targetUserId.isBlank()) ? targetUserId
+                : participants.stream().filter(m -> !m.getUser().getId().equals(userId)).map(m -> m.getUser().getId()).findFirst().orElse(userId);
+        ConversationMember targetMember = members.findByConversationIdAndUserId(id, target)
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+        String cleaned = (nickname == null || nickname.isBlank()) ? null : nickname.trim();
+        targetMember.setNickname(cleaned);
+        members.save(targetMember);
+        for (ConversationMember recipient : participants) {
+            events.publishEvent(new ChatEvent("conversation.nickname", id, recipient.getUser().getId(),
+                    Map.of("targetUserId", target, "nickname", cleaned != null ? cleaned : "")));
+        }
+    }
+
     public void block(String actorId, String targetId, boolean blocked) {
         if (actorId.equals(targetId)) invalid();
         User actor = user(actorId);
@@ -135,12 +155,18 @@ public class ChatService {
         } else blocks.deleteByBlockerIdAndBlockedId(actorId, targetId);
     }
 
+    @Transactional(readOnly = true)
+    public List<PublicUser> blockedUsers(String actorId) {
+        return blocks.findByBlockerId(actorId).stream().map(b -> PublicUser.from(b.getBlocked())).toList();
+    }
+
     public MessageResponse revoke(String id, String messageId, String userId) {
         lock(id);
         member(id, userId);
         ChatMessage message = findMessage(id, messageId);
         if (!message.getSender().getId().equals(userId)) forbidden();
         message.setRevoked(true);
+        message.setPinned(false);
         message.setContent("");
         message.setFileName(null); message.setFileSize(null); message.setFileUrl(null); message.setImageUrl(null);
         List<ConversationMember> participants = members.findByConversationId(id);
@@ -154,6 +180,7 @@ public class ChatService {
         lock(id);
         member(id, userId);
         ChatMessage message = findMessage(id, messageId);
+        if (message.isRevoked() && pinned) invalid();
         message.setPinned(pinned);
         List<ConversationMember> participants = members.findByConversationId(id);
         for (ConversationMember recipient : participants) {
@@ -169,14 +196,29 @@ public class ChatService {
     }
 
     private ConversationResponse conversation(Conversation conversation, ConversationMember viewer) {
-        List<PublicUser> participants = members.findByConversationId(conversation.getId()).stream().map(m -> PublicUser.from(m.getUser())).toList();
+        List<ConversationMember> allMembers = members.findByConversationId(conversation.getId());
+        List<PublicUser> participants = allMembers.stream().map(m -> PublicUser.from(m.getUser())).toList();
         PublicUser other = participants.stream().filter(u -> !u.id().equals(viewer.getUser().getId())).findFirst().orElse(PublicUser.from(viewer.getUser()));
+        ConversationMember otherMember = allMembers.stream().filter(m -> !m.getUser().getId().equals(viewer.getUser().getId())).findFirst().orElse(viewer);
+        String nickname = conversation.isGroupChat() ? null : otherMember.getNickname();
+        String displayName = conversation.isGroupChat() ? conversation.getName()
+                : (nickname != null && !nickname.isBlank() ? nickname : other.name());
         ChatMessage latest = messages.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId()).orElse(null);
-        return new ConversationResponse(conversation.getId(), conversation.isGroupChat() ? conversation.getName() : other.name(),
-                conversation.isGroupChat() ? null : other.avatar(), latest == null || latest.isRevoked() ? "" : latest.getContent(),
+        String previewText = "";
+        if (latest != null && !latest.isRevoked()) {
+            if (latest.getContent() != null && !latest.getContent().isBlank()) {
+                previewText = latest.getContent();
+            } else if ("image".equalsIgnoreCase(latest.getType())) {
+                previewText = "[Hình ảnh]";
+            } else if ("file".equalsIgnoreCase(latest.getType())) {
+                previewText = "[Tệp đính kèm]";
+            }
+        }
+        return new ConversationResponse(conversation.getId(), displayName,
+                conversation.isGroupChat() ? null : other.avatar(), previewText,
                 latest == null ? conversation.getCreatedAt() : latest.getCreatedAt(),
                 messages.countUnread(conversation.getId(), viewer.getUser().getId(), viewer.getLastReadAt()), conversation.isGroupChat(), false,
-                viewer.isPinned(), viewer.isMuted(), participants);
+                viewer.isPinned(), viewer.isMuted(), participants, nickname);
     }
 
     private MessageResponse message(ChatMessage message, String userId, List<ConversationMember> participants) {

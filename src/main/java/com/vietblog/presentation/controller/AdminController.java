@@ -22,8 +22,8 @@ public class AdminController {
     private final AdminService admin;
 
     @GetMapping("/stats")
-    public ApiResponse<AdminDtos.Stats> stats() {
-        return ApiResponse.success(admin.stats(), "Dashboard statistics");
+    public ApiResponse<AdminDtos.Stats> stats(@RequestParam(defaultValue = "7") int days) {
+        return ApiResponse.success(admin.stats(days), "Dashboard statistics");
     }
 
     @GetMapping("/users")
@@ -49,6 +49,7 @@ public class AdminController {
     }
 
     @GetMapping("/posts")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public ApiResponse<List<AdminDtos.PostResponse>> posts(
             @RequestParam(required = false) Post.PostStatus status, @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int limit) {
@@ -59,8 +60,15 @@ public class AdminController {
     }
 
     @PatchMapping("/posts/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public ApiResponse<AdminDtos.PostResponse> postStatus(@PathVariable String id,
                                                         @Valid @RequestBody AdminDtos.PostStatusRequest request) {
         return ApiResponse.success(admin.changePostStatus(id, request.status()), "Post status updated");
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ApiResponse<Void> deleteUser(@PathVariable String id, @AuthenticationPrincipal UserPrincipal currentUser) {
+        admin.deleteUser(id, currentUser.getId());
+        return ApiResponse.success(null, "User deleted");
     }
 }

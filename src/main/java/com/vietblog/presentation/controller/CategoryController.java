@@ -7,6 +7,7 @@ import com.vietblog.application.service.CategoryApplicationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class CategoryController {
     private final CategoryApplicationService categoryApplicationService;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
             @Valid @RequestBody CreateCategoryRequest request) {
         CategoryResponse response = categoryApplicationService.createCategory(request);
@@ -38,6 +40,7 @@ public class CategoryController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable String id,
             @Valid @RequestBody CreateCategoryRequest request) {
@@ -46,6 +49,7 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Object>> deleteCategory(@PathVariable String id) {
         categoryApplicationService.deleteCategory(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Xóa danh mục thành công"));
