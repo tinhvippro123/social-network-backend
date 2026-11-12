@@ -1,9 +1,9 @@
 package com.vietblog.presentation.controller;
 
-import java.util.Map;
 import com.vietblog.application.dto.ApiResponse;
 import com.vietblog.application.dto.post.PostResponse;
-import com.vietblog.application.dto.search.*;
+import com.vietblog.application.dto.search.SummaryResponse;
+import com.vietblog.application.dto.search.TextRequest;
 import com.vietblog.application.service.SearchApplicationService;
 import com.vietblog.domain.search.TextAlgorithms;
 import com.vietblog.infrastructure.security.UserPrincipal;
@@ -14,7 +14,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -30,25 +32,31 @@ public class SearchController {
 
     @GetMapping("/search")
     public ApiResponse<List<PostResponse>> search(@RequestParam String q, @RequestParam(defaultValue = "keyword") String type,
-                                                  @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(search.search(q, type, limit), "Search completed");
+                                                  @RequestParam(defaultValue = "20") int limit,
+                                                  @AuthenticationPrincipal UserPrincipal currentUser) {
+        String viewerId = currentUser != null ? currentUser.getId() : null;
+        return ApiResponse.success(search.search(q, type, limit, viewerId), "Search completed");
     }
 
     @GetMapping("/search/semantic")
-    public ApiResponse<List<PostResponse>> semantic(@RequestParam String q, @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(search.search(q, "semantic", limit), "Search completed");
+    public ApiResponse<List<PostResponse>> semantic(@RequestParam String q, @RequestParam(defaultValue = "20") int limit,
+                                                    @AuthenticationPrincipal UserPrincipal currentUser) {
+        String viewerId = currentUser != null ? currentUser.getId() : null;
+        return ApiResponse.success(search.search(q, "semantic", limit, viewerId), "Search completed");
     }
 
     @PostMapping(value = "/search/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("isAuthenticated()")
-    public ApiResponse<List<PostResponse>> image(@RequestParam MultipartFile image, @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(search.searchImage(image, limit), "Search completed");
+    public ApiResponse<List<PostResponse>> image(@RequestParam MultipartFile image, @RequestParam(defaultValue = "20") int limit,
+                                                 @AuthenticationPrincipal UserPrincipal currentUser) {
+        String viewerId = currentUser != null ? currentUser.getId() : null;
+        return ApiResponse.success(search.searchImage(image, limit, viewerId), "Search completed");
     }
 
     @PostMapping(value = "/search/document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("isAuthenticated()")
-    public ApiResponse<List<PostResponse>> document(@RequestParam MultipartFile file, @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(search.searchDocument(file, limit), "Search completed");
+    public ApiResponse<List<PostResponse>> document(@RequestParam MultipartFile file, @RequestParam(defaultValue = "20") int limit,
+                                                    @AuthenticationPrincipal UserPrincipal currentUser) {
+        String viewerId = currentUser != null ? currentUser.getId() : null;
+        return ApiResponse.success(search.searchDocument(file, limit, viewerId), "Search completed");
     }
 
     @PostMapping(value = "/posts/{id}/search-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -61,8 +69,10 @@ public class SearchController {
 
     @GetMapping("/posts/nearby")
     public ApiResponse<List<PostResponse>> nearby(@RequestParam double lat, @RequestParam double lng,
-                                                  @RequestParam(defaultValue = "5") double radius, @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(search.nearby(lat, lng, radius, limit), "Nearby posts retrieved");
+                                                  @RequestParam(defaultValue = "5") double radius, @RequestParam(defaultValue = "20") int limit,
+                                                  @AuthenticationPrincipal UserPrincipal currentUser) {
+        String viewerId = currentUser != null ? currentUser.getId() : null;
+        return ApiResponse.success(search.nearby(lat, lng, radius, limit, viewerId), "Nearby posts retrieved");
     }
 
     @GetMapping("/posts/{id}/summary")

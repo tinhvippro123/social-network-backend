@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
     "spring.datasource.password=",
     "spring.jpa.hibernate.ddl-auto=create-drop",
     "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+    "chat.redis.enabled=false",
     "cloudinary.cloud-name=test", "cloudinary.api-key=test", "cloudinary.api-secret=test"
 })
 class VietblogBackendApplicationTests {

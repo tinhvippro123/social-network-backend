@@ -87,8 +87,11 @@ public class UserController {
     public ResponseEntity<ApiResponse<List<PostResponse>>> getUserPosts(
             @PathVariable String id,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int limit) {
-        Page<PostResponse> postPage = userApplicationService.getUserPosts(id, page, limit);
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(defaultValue = "PUBLISHED") String status,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        String viewerId = currentUser != null ? currentUser.getId() : null;
+        Page<PostResponse> postPage = userApplicationService.getUserPosts(id, page, limit, status, viewerId);
 
         ApiResponse.Meta meta = new ApiResponse.Meta(page, limit, postPage.getTotalElements(), postPage.getTotalPages());
         ApiResponse<List<PostResponse>> response = ApiResponse.success(postPage.getContent(), "Lấy danh sách bài viết thành công");

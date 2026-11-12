@@ -48,7 +48,7 @@ public class Post {
     @Builder.Default
     private PostStatus status = PostStatus.DRAFT;
 
-    // Thá»‘ng kÃª
+    // Thống kê
     @Builder.Default
     private int viewsCount = 0;
     @Builder.Default
@@ -58,16 +58,16 @@ public class Post {
     @Builder.Default
     private int commentsCount = 0;
 
-    // Vá»‹ trÃ­ Ä‘á»‹a lÃ½ (cho tÃ­nh nÄƒng Map + Geospatial Search)
+    // Vị trí địa lý (cho tính năng Map + Geospatial Search)
     private Double latitude;
     private Double longitude;
     private String locationAddress;
 
-    // Sá»± kiá»‡n (cho bÃ i viáº¿t dáº¡ng event)
+    // Sự kiện (cho bài viết dạng event)
     private LocalDateTime eventStartTime;
     private LocalDateTime eventEndTime;
 
-    // â”€â”€ Trending Score (Ä‘Æ°á»£c tÃ­nh bá»Ÿi giáº£i thuáº­t) â”€â”€
+    // ── Trending Score (được tính bởi giải thuật) ──
     @Builder.Default
     private double trendingScore = 0.0;
 

@@ -1,7 +1,6 @@
 package com.vietblog.infrastructure.repository;
 
 import com.vietblog.domain.entity.Category;
-import com.vietblog.domain.entity.Notification;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
 import jakarta.persistence.EntityManager;

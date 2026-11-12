@@ -18,11 +18,14 @@ public final class ReportDtos {
     public enum Action { KEEP, DELETE, BAN }
     public record ResolveRequest(@NotNull Action action) { }
     public record Reporter(String id, String name, String avatar) { }
-    public record Response(String id, String targetId, String type, String targetTitle, String reason,
+    public record Response(String id, String targetId, String targetPostId, String type, String targetTitle, String reason,
                            String description, String status, LocalDateTime createdAt, Reporter reporter,
                            String action, LocalDateTime resolvedAt, String resolvedById) {
         public static Response from(Report report) {
-            return new Response(report.getId(), report.getTargetId(), report.getType().name().toLowerCase(Locale.ROOT),
+            return from(report, null);
+        }
+        public static Response from(Report report, String targetPostId) {
+            return new Response(report.getId(), report.getTargetId(), targetPostId, report.getType().name().toLowerCase(Locale.ROOT),
                     report.getTargetTitle(), report.getReason(), report.getDescription(),
                     report.getStatus().name().toLowerCase(Locale.ROOT), report.getCreatedAt(),
                     new Reporter(report.getReporter().getId(), report.getReporter().getName(), report.getReporter().getAvatar()),

@@ -26,7 +26,8 @@ public class PostDomainService {
                          + (post.getViewsCount() * 0.1);
                          
         // Phân rã theo thời gian (Gravity decay)
-        double hoursAge = Math.max(0, Duration.between(post.getCreatedAt(), LocalDateTime.now()).toSeconds() / 3600.0);
+        LocalDateTime createdAt = post.getCreatedAt() != null ? post.getCreatedAt() : LocalDateTime.now();
+        double hoursAge = Math.max(0, Duration.between(createdAt, LocalDateTime.now()).toSeconds() / 3600.0);
         double gravity = 1.8;
         
         // Tránh chia cho 0

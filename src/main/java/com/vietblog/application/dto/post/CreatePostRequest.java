@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -41,4 +42,17 @@ public class CreatePostRequest {
 
     @AssertTrue(message = "Latitude and longitude must be provided together")
     public boolean isLocationComplete() { return (latitude == null) == (longitude == null); }
+
+    @Size(max = 500)
+    private String locationAddress;
+
+    // Thời gian diễn ra (dành cho bài viết dạng sự kiện)
+    private LocalDateTime eventStartTime;
+    private LocalDateTime eventEndTime;
+
+    @AssertTrue(message = "Event end time must be after start time")
+    public boolean isEventTimeValid() {
+        if (eventEndTime == null) return true;
+        return eventStartTime != null && !eventEndTime.isBefore(eventStartTime);
+    }
 }

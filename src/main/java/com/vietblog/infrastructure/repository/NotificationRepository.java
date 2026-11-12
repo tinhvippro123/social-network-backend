@@ -22,4 +22,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Stri
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Notification n set n.isRead = true where n.user.id = :userId and n.isRead = false")
     int markAllRead(@Param("userId") String userId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from Notification n where n.id = :id and n.user.id = :userId")
+    int deleteByIdAndUserId(@Param("id") String id, @Param("userId") String userId);
 }

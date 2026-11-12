@@ -3,21 +3,26 @@ package com.vietblog.infrastructure.exception;
 import com.vietblog.application.dto.ApiResponse;
 import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.DomainException;
+import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
-import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,13 +36,31 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({MissingServletRequestParameterException.class, MissingServletRequestPartException.class,
             MethodArgumentTypeMismatchException.class, HttpMessageNotReadableException.class})
     public ResponseEntity<ApiResponse<Object>> handleMalformedRequest(Exception ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.error("INVALID_INPUT", "Invalid request"));
+        return ResponseEntity.badRequest().body(ApiResponse.error("INVALID_INPUT", "Dữ liệu yêu cầu không hợp lệ"));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleNoResourceFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("NOT_FOUND", "Không tìm thấy đường dẫn yêu cầu"));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(ApiResponse.error("METHOD_NOT_ALLOWED", "Phương thức HTTP không được hỗ trợ"));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(ApiResponse.error("UNSUPPORTED_MEDIA_TYPE", "Định dạng dữ liệu không được hỗ trợ"));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Object>> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
-                .body(ApiResponse.error("INVALID_INPUT", "Uploaded file exceeds the size limit"));
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                .body(ApiResponse.error("INVALID_INPUT", "Kích thước tệp tải lên vượt quá giới hạn cho phép (tối đa 5MB)"));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -60,7 +83,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ApiResponse<Object>> handleBusinessRuleException(BusinessRuleException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        HttpStatus status = ex.getErrorCode() == ErrorCode.UNAUTHORIZED
+                ? HttpStatus.UNAUTHORIZED
+                : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status)
                 .body(ApiResponse.error(ex.getErrorCode().name(), ex.getMessage()));
     }
 
@@ -84,7 +110,7 @@ public class GlobalExceptionHandler {
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
-        
+
         ApiResponse<Object> response = ApiResponse.builder()
                 .success(false)
                 .message("Dữ liệu đầu vào không hợp lệ")

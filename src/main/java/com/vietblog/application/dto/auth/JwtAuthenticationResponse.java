@@ -1,5 +1,6 @@
 package com.vietblog.application.dto.auth;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.vietblog.domain.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,9 +9,14 @@ import java.time.LocalDateTime;
 
 @Data
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class JwtAuthenticationResponse {
     private String accessToken;
     private UserDto user;
+
+    public JwtAuthenticationResponse(UserDto user) {
+        this(null, user);
+    }
 
     @Data
     @AllArgsConstructor
@@ -25,7 +31,7 @@ public class JwtAuthenticationResponse {
         private int postsCount;
         private int followersCount;
         private int followingCount;
-        
+
         public static UserDto fromEntity(User user) {
             return new UserDto(
                 user.getId(),

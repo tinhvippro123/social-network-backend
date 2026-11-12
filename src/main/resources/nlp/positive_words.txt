@@ -1,0 +1,359 @@
+# Vietnamese Positive Sentiment Words
+tốt
+hay
+đẹp
+thích
+yêu
+tuyệt
+tuyệt vời
+vui
+đỉnh
+chuẩn
+xịn
+mê
+ngon
+giỏi
+pro
+chất
+siêu
+bổ
+quý
+mượt
+nhanh
+sạch
+hài lòng
+thành công
+tích cực
+ủng hộ
+khen
+ưu điểm
+chính xác
+hiệu quả
+hấp dẫn
+sáng tạo
+thân thiện
+dễ thương
+nhiệt tình
+chu đáo
+uy tín
+chất lượng
+tận tâm
+tiến bộ
+xuất sắc
+hoàn hảo
+hảo
+đáng tin
+đáng giá
+hữu ích
+bổ ích
+ổn
+yên tâm
+an tâm
+hạnh phúc
+may mắn
+thuận lợi
+tươi sáng
+rực rỡ
+phong phú
+vững chắc
+bền đẹp
+thông minh
+sáng suốt
+khéo léo
+tự hào
+say mê
+hào hứng
+phấn khởi
+đặc sắc
+ấn tượng
+thú vị
+cuốn hút
+tuyệt đỉnh
+tuyệt cú mèo
+chất lượng cao
+đáng khen
+vui vẻ
+hoan nghênh
+ngưỡng mộ
+kính phục
+tin tưởng
+chắc chắn
+hợp lý
+thấu hiểu
+chăm chỉ
+cần cù
+lịch sự
+tao nhã
+tinh tế
+sắc sảo
+nhạy bén
+gắn kết
+đoàn kết
+văn minh
+khoa học
+gọn gàng
+ngăn nắp
+gần gũi
+trung thực
+thành thật
+thật thà
+rõ ràng
+minh bạch
+đúng đắn
+hợp pháp
+an toàn
+bảo đảm
+phù hợp
+đúng giờ
+tiện lợi
+tiện ích
+tiết kiệm
+thỏa mãn
+dễ chịu
+thoải mái
+sảng khoái
+rạng rỡ
+nụ cười
+ấm áp
+ngọt ngào
+chan hòa
+yêu thương
+trân trọng
+cảm ơn
+biết ơn
+tôn trọng
+thân ái
+hòa đồng
+hăng hái
+đầy nhiệt huyết
+lạc quan
+tươi vui
+rạng ngời
+tuyệt hảo
+thần thánh
+siêu phẩm
+cực phẩm
+tuyệt kỹ
+đẳng cấp
+bản lĩnh
+kiên trì
+bền bỉ
+vượt trội
+bứt phá
+thành tựu
+thắng lợi
+chiến thắng
+thăng tiến
+phát triển
+thịnh vượng
+tài năng
+xuất chúng
+ưu tú
+cao quý
+thanh lịch
+quý phái
+duyên dáng
+rạng rỡ
+lung linh
+ngời sáng
+tỏa sáng
+đẹp đẽ
+tươi đẹp
+rực rỡ
+tuyệt diệu
+mãn nhãn
+mê ly
+hút hồn
+hớp hồn
+mê đắm
+ngây ngất
+đắm say
+say đắm
+thích thú
+khoái chí
+hớn hở
+hớn hở
+tươi tỉnh
+rạng rỡ
+tự tin
+kiên định
+quyết đoán
+vững vàng
+chắc nịch
+bất bại
+thần kỳ
+kỳ diệu
+phi thường
+diệu kỳ
+đáng ngưỡng mộ
+đáng nể
+nể phục
+khâm phục
+thán phục
+kính cẩn
+kính trọng
+quý mến
+yêu mến
+thương mến
+ái mộ
+ái hữu
+tri ân
+cứu tinh
+hồng ân
+phúc lành
+may mắn
+vạn sự như ý
+thuận buồm xuôi gió
+phát tài
+an khang
+thịnh vượng
+hòa bình
+thanh bình
+an bình
+ấm êm
+hạnh phúc
+viên mãn
+trọn vẹn
+hoàn mĩ
+hoàn chỉnh
+chuẩn mực
+mẫu mực
+tấm gương
+gương mẫu
+sáng danh
+danh giá
+nổi tiếng
+vang danh
+lẫy lừng
+vang dội
+thành công vang dội
+vinh quang
+vinh hạnh
+tự hào
+kiêu hãnh
+ngẩng cao đầu
+thẳng thắn
+trung kiên
+ngay thẳng
+chính trực
+liêm khiết
+trong sạch
+vô tư
+công bằng
+công tâm
+công lý
+chính nghĩa
+đoan trang
+thuần khiết
+tinh khôi
+trong sáng
+thanh khiết
+trong trẻo
+ngây thơ
+dịu dàng
+hiền dịu
+hiền hòa
+nhã nhặn
+ôn hòa
+điềm đạm
+trầm tĩnh
+chín chắn
+trưởng thành
+khôn ngoan
+thông thái
+uyên bác
+hiểu biết
+sâu sắc
+tinh thông
+thành thạo
+điêu luyện
+thuần thục
+nhuần nhuyễn
+chuyên nghiệp
+bài bản
+quy chuẩn
+chuẩn xác
+tinh vi
+chuẩn chỉ
+nét căng
+xịn sò
+đỉnh cao
+bá đạo
+hết nước chấm
+đỉnh của chóp
+xịn mịn
+cháy
+chất như nước cất
+chuẩn không cần chỉnh
+đẹp không tì vết
+đẹp mê ly
+đẹp xuất sắc
+good
+great
+excellent
+love
+helpful
+awesome
+best
+amazing
+wonderful
+perfect
+fantastic
+super
+nice
+clean
+fast
+brilliant
+outstanding
+magnificent
+superb
+marvelous
+fabulous
+stellar
+terrific
+splendid
+exceptional
+impressive
+positive
+happy
+joy
+proud
+recommend
+trusted
+valuable
+useful
+flawless
+favorite
+gem
+pro
+cool
+fine
+solid
+smooth
+easy
+efficient
+effective
+smart
+beautiful
+gorgeous
+lovely
+pleased
+satisfied
+delighted
+friendly
+kind
+generous
+honest
+truthful
+polite
+creative
+innovative
+powerful
+strong
+reliable
+secure
+stable
+fresh
+sweet
+charming
+wonderful

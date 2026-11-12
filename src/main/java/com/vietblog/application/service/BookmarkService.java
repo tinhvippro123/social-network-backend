@@ -58,6 +58,10 @@ public class BookmarkService {
         if (page < 1 || limit < 1 || limit > 100) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
         return bookmarkRepository.findByUserIdAndPostStatusOrderByCreatedAtDesc(userId, Post.PostStatus.PUBLISHED,
                 PageRequest.of(page - 1, limit))
-                .map(bookmark -> PostResponse.fromEntity(bookmark.getPost()));
+                .map(bookmark -> {
+                    Post p = bookmark.getPost();
+                    int count = p.getAuthor() != null ? p.getAuthor().getPostsCount() : 0;
+                    return PostResponse.fromEntity(p, count, true);
+                });
     }
 }

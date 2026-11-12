@@ -5,9 +5,11 @@ import com.vietblog.application.service.ChatEvent;
 import com.vietblog.application.service.ChatService;
 import com.vietblog.domain.exception.DomainException;
 import com.vietblog.infrastructure.repository.UserRepository;
+import com.vietblog.infrastructure.security.AuthCookieService;
 import com.vietblog.infrastructure.security.JwtTokenProvider;
 import jakarta.annotation.PreDestroy;
 import jakarta.validation.Validator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -23,14 +25,23 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final ChatService service;
     private final ObjectMapper json;
     private final Validator validator;
+    private final AuthCookieService cookieService;
     private final ConcurrentMap<String, Client> clients = new ConcurrentHashMap<>();
     private final ScheduledExecutorService expiry = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "chat-session-expiry"); thread.setDaemon(true); return thread;
     });
 
-    public ChatWebSocketHandler(JwtTokenProvider tokens, UserRepository users, ChatService service, ObjectMapper json, Validator validator) {
-        this.tokens = tokens; this.users = users; this.service = service; this.json = json; this.validator = validator;
+    @Autowired
+    public ChatWebSocketHandler(JwtTokenProvider tokens, UserRepository users, ChatService service,
+            ObjectMapper json, Validator validator, AuthCookieService cookieService) {
+        this.tokens = tokens; this.users = users; this.service = service;
+        this.json = json; this.validator = validator; this.cookieService = cookieService;
         expiry.scheduleWithFixedDelay(this::expireSessions, 10, 10, TimeUnit.SECONDS);
+    }
+
+    public ChatWebSocketHandler(JwtTokenProvider tokens, UserRepository users, ChatService service,
+            ObjectMapper json, Validator validator) {
+        this(tokens, users, service, json, validator, AuthCookieService.defaultInstance());
     }
 
     public record Frame(String type, String token, String conversationId, SendRequest message) {}
@@ -38,7 +49,21 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override public void afterConnectionEstablished(WebSocketSession session) {
         session.setTextMessageSizeLimit(32768);
-        clients.put(session.getId(), new Client(session, null, null, System.currentTimeMillis()));
+        long now = System.currentTimeMillis();
+        String cookieToken = cookieService.extractAccessTokenFromHeaders(session.getHandshakeHeaders());
+        if (cookieToken != null && validToken(cookieToken)) {
+            String userId = tokens.getUserIdFromJWT(cookieToken);
+            if (users.findById(userId).map(u -> u.isActive()).orElse(false)) {
+                clients.put(session.getId(), new Client(session, userId, cookieToken, now));
+                try {
+                    send(session, Map.of("type", "authenticated", "userId", userId));
+                } catch (IOException ex) {
+                    close(session, CloseStatus.SERVER_ERROR);
+                }
+                return;
+            }
+        }
+        clients.put(session.getId(), new Client(session, null, null, now));
     }
 
     @Override protected void handleTextMessage(WebSocketSession session, TextMessage text) throws IOException {
@@ -47,7 +72,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         try {
             Frame frame = json.readValue(text.getPayload(), Frame.class);
             if (client.userId() == null) {
-                if (!"auth".equals(frame.type()) || frame.token() == null || !validToken(frame.token())) {
+                if (!"auth".equals(frame.type()) || frame.token() == null || !validAuthToken(frame.token())) {
                     close(session, CloseStatus.POLICY_VIOLATION); return;
                 }
                 String userId = tokens.getUserIdFromJWT(frame.token());
@@ -59,6 +84,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
             if (!validClient(client)) { close(session, CloseStatus.POLICY_VIOLATION); return; }
+            if ("auth".equals(frame.type())) { send(session, Map.of("type", "authenticated", "userId", client.userId())); return; }
             if ("ping".equals(frame.type())) { send(session, Map.of("type", "pong")); return; }
             if (frame.conversationId() == null || frame.conversationId().isBlank()) throw new IllegalArgumentException("conversationId is required");
             switch (frame.type() == null ? "" : frame.type()) {
@@ -91,8 +117,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private boolean validToken(String token) {
         try { return tokens.validateToken(token); } catch (RuntimeException ex) { return false; }
     }
+    private boolean validWsTicket(String token) {
+        try { return tokens.validateWsTicket(token); } catch (RuntimeException ex) { return false; }
+    }
+    private boolean validAuthToken(String token) {
+        return validToken(token) || validWsTicket(token);
+    }
     private boolean validClient(Client client) {
-        return validToken(client.token()) && users.findById(client.userId()).map(u -> u.isActive()).orElse(false);
+        return validAuthToken(client.token()) && users.findById(client.userId()).map(u -> u.isActive()).orElse(false);
     }
     private void send(WebSocketSession session, Object payload) throws IOException {
         synchronized (session) { if (session.isOpen()) session.sendMessage(new TextMessage(json.writeValueAsString(payload))); }

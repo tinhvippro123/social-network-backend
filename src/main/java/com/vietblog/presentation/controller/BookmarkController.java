@@ -1,6 +1,5 @@
 package com.vietblog.presentation.controller;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import com.vietblog.application.dto.ApiResponse;
 import com.vietblog.application.service.BookmarkService;
 import com.vietblog.infrastructure.security.UserPrincipal;
@@ -20,18 +19,19 @@ public class BookmarkController {
     public ResponseEntity<ApiResponse<Boolean>> toggleBookmark(
             @PathVariable String postId,
             @AuthenticationPrincipal UserPrincipal currentUser) {
-        
+
         boolean isBookmarked = bookmarkService.toggleBookmark(postId, currentUser.getId());
         String message = isBookmarked ? "Đã lưu bài viết" : "Đã bỏ lưu bài viết";
         return ResponseEntity.ok(ApiResponse.success(isBookmarked, message));
     }
 
     @GetMapping("/check")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Boolean>> checkBookmark(
             @PathVariable String postId,
             @AuthenticationPrincipal UserPrincipal currentUser) {
-        
+        if (currentUser == null) {
+            return ResponseEntity.ok(ApiResponse.success(false, "Chưa đăng nhập"));
+        }
         boolean isBookmarked = bookmarkService.checkIsBookmarked(postId, currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success(isBookmarked, "Kiểm tra trạng thái lưu bài"));
     }

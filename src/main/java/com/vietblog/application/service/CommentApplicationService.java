@@ -1,5 +1,6 @@
 package com.vietblog.application.service;
 
+import com.vietblog.application.port.CacheGateway;
 import com.vietblog.domain.entity.Notification;
 import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.application.dto.comment.CommentResponse;
@@ -31,6 +32,7 @@ public class CommentApplicationService {
     private final CommentDomainService commentDomainService;
     private final com.vietblog.infrastructure.repository.NotificationRepository notifications;
     private final PostDomainService postDomainService;
+    private final CacheGateway cache;
 
     @Transactional
     public CommentResponse addComment(String postId, String authorId, CreateCommentRequest request) {
@@ -66,9 +68,25 @@ public class CommentApplicationService {
         comment = commentRepository.save(comment);
         post.setCommentsCount(post.getCommentsCount() + 1);
         postDomainService.calculateTrendingScore(post);
-        if (!post.getAuthor().getId().equals(authorId)) {
-            notifications.save(Notification.builder().user(post.getAuthor()).type(Notification.NotificationType.COMMENT)
-                    .message(author.getName() + " commented on your post").avatar(author.getAvatar()).link("/posts/" + postId).build());
+        cache.evict(PostApplicationService.TRENDING_IDS_CACHE_KEY);
+        if (parentComment != null && !parentComment.getAuthor().getId().equals(authorId)) {
+            notifications.save(Notification.builder()
+                    .user(parentComment.getAuthor())
+                    .type(Notification.NotificationType.COMMENT)
+                    .message(author.getName() + " đã trả lời bình luận của bạn")
+                    .avatar(author.getAvatar())
+                    .link("/posts/" + postId + "#comment-" + comment.getId())
+                    .build());
+        }
+        if (!post.getAuthor().getId().equals(authorId)
+                && (parentComment == null || !parentComment.getAuthor().getId().equals(post.getAuthor().getId()))) {
+            notifications.save(Notification.builder()
+                    .user(post.getAuthor())
+                    .type(Notification.NotificationType.COMMENT)
+                    .message(author.getName() + " đã bình luận về bài viết của bạn")
+                    .avatar(author.getAvatar())
+                    .link("/posts/" + postId + "#comment-" + comment.getId())
+                    .build());
         }
 
         // Lấy lại từ DB để lấy được toàn bộ context nếu cần (đặc biệt khi lưu xong)
@@ -93,9 +111,17 @@ public class CommentApplicationService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.COMMENT_NOT_FOUND));
 
-        // Kiểm tra quyền: Chỉ tác giả comment mới được xóa
+        // Kiểm tra quyền: Tác giả comment, tác giả bài viết hoặc Admin/Moderator mới được xóa
         if (!comment.getAuthor().getId().equals(userId)) {
-            throw new ForbiddenException(ErrorCode.COMMENT_DELETE_FORBIDDEN);
+            boolean isPostOwner = comment.getPost() != null
+                    && comment.getPost().getAuthor() != null
+                    && comment.getPost().getAuthor().getId().equals(userId);
+            boolean isAdminOrMod = userRepository.findById(userId)
+                    .map(u -> u.getRole() == User.Role.ADMIN || u.getRole() == User.Role.MODERATOR)
+                    .orElse(false);
+            if (!isPostOwner && !isAdminOrMod) {
+                throw new ForbiddenException(ErrorCode.COMMENT_DELETE_FORBIDDEN);
+            }
         }
 
         Post post = postRepository.findLockedById(comment.getPost().getId())
@@ -104,6 +130,7 @@ public class CommentApplicationService {
         commentRepository.flush();
         post.setCommentsCount(Math.toIntExact(commentRepository.countByPostId(post.getId())));
         postDomainService.calculateTrendingScore(post);
+        cache.evict(PostApplicationService.TRENDING_IDS_CACHE_KEY);
     }
 
     @Transactional

@@ -60,7 +60,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private int resolveLimit(String path, String method) {
-        // High-sensitivity write endpoints: Reports, Chat Messages, Auth
+        // High-sensitivity write endpoints: Reports, Chat Messages, Auth, Uploads
         if ("POST".equalsIgnoreCase(method)) {
             if (path.startsWith("/api/reports")) {
                 return 20; // 20 reports per minute
@@ -68,8 +68,13 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             if (path.contains("/messages")) {
                 return 120; // 120 chat messages per minute (2 msgs/sec avg)
             }
-            if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register")) {
+            if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register")
+                    || path.startsWith("/api/auth/forgot-password") || path.startsWith("/api/auth/reset-password")
+                    || path.startsWith("/api/auth/google")) {
                 return 30; // 30 auth attempts per minute
+            }
+            if (path.startsWith("/api/files/upload")) {
+                return 30; // 30 file uploads per minute
             }
             if (path.startsWith("/api/posts")) {
                 return 40; // 40 post operations per minute
