@@ -19,6 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -102,6 +103,17 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletResponse servletResponse) {
         authCookieService.clearAuthCookies(servletResponse);
         return ResponseEntity.ok(ApiResponse.success(null, "Đăng xuất thành công"));
+    }
+
+    @PostMapping("/ws-ticket")
+    public ResponseEntity<ApiResponse<Map<String, String>>> createWebSocketTicket(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("UNAUTHORIZED", "Vui lòng đăng nhập"));
+        }
+        String ticket = authService.createWebSocketTicket(currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success(Map.of("ticket", ticket), "Tạo mã kết nối WebSocket thành công"));
     }
 
     @PutMapping("/me/password")

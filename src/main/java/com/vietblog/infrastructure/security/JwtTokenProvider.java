@@ -19,6 +19,7 @@ public class JwtTokenProvider {
     public static final String TOKEN_TYPE_CLAIM = "type";
     public static final String TOKEN_TYPE_ACCESS = "access";
     public static final String TOKEN_TYPE_REFRESH = "refresh";
+    public static final String TOKEN_TYPE_WS = "ws";
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -28,6 +29,9 @@ public class JwtTokenProvider {
 
     @Value("${jwt.refresh-token-expiration:604800000}")
     private long refreshExpirationInMs = 604_800_000L;
+
+    @Value("${jwt.ws-ticket-expiration:3600000}")
+    private long wsTicketExpirationInMs = 3_600_000L;
 
     private SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
@@ -66,6 +70,20 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public String generateWsTicketFromUserId(String userId) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + wsTicketExpirationInMs);
+
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject(userId)
+                .claim(TOKEN_TYPE_CLAIM, TOKEN_TYPE_WS)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
     public String getUserIdFromJWT(String token) {
         return parseClaims(token).getSubject();
     }
@@ -74,7 +92,7 @@ public class JwtTokenProvider {
         try {
             Claims claims = parseClaims(authToken);
             String tokenType = claims.get(TOKEN_TYPE_CLAIM, String.class);
-            return !TOKEN_TYPE_REFRESH.equals(tokenType);
+            return !TOKEN_TYPE_REFRESH.equals(tokenType) && !TOKEN_TYPE_WS.equals(tokenType);
         } catch (MalformedJwtException ex) {
             log.error("Invalid JWT token");
         } catch (ExpiredJwtException ex) {
@@ -94,6 +112,17 @@ public class JwtTokenProvider {
             return TOKEN_TYPE_REFRESH.equals(tokenType);
         } catch (JwtException | IllegalArgumentException ex) {
             log.debug("Invalid or expired refresh JWT token: {}", ex.getMessage());
+            return false;
+        }
+    }
+
+    public boolean validateWsTicket(String wsTicket) {
+        try {
+            Claims claims = parseClaims(wsTicket);
+            String tokenType = claims.get(TOKEN_TYPE_CLAIM, String.class);
+            return TOKEN_TYPE_WS.equals(tokenType);
+        } catch (JwtException | IllegalArgumentException ex) {
+            log.debug("Invalid or expired WebSocket ticket: {}", ex.getMessage());
             return false;
         }
     }

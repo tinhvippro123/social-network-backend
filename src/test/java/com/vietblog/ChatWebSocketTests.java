@@ -77,6 +77,26 @@ class ChatWebSocketTests {
         verify(cookieSession).sendMessage(any(TextMessage.class));
     }
 
+    @Test void wsTicketAuthenticatesOverAuthFrameAndStopsWhenExpired() throws Exception {
+        when(tokens.validateToken("ws-ticket")).thenReturn(false);
+        when(tokens.validateWsTicket("ws-ticket")).thenReturn(true);
+        when(tokens.getUserIdFromJWT("ws-ticket")).thenReturn("user-1");
+
+        handler.handleMessage(session, new TextMessage("{\"type\":\"auth\",\"token\":\"ws-ticket\"}"));
+        verify(session).sendMessage(argThat(m -> ((TextMessage) m).getPayload().contains("\"authenticated\"")));
+
+        clearInvocations(session);
+        when(chat.canReceive("conversation", "user-1")).thenReturn(true);
+        handler.deliver(new ChatEvent("message.created", "conversation", "user-1", Map.of("content", "hello")));
+        verify(session).sendMessage(any(TextMessage.class));
+
+        clearInvocations(session);
+        when(tokens.validateWsTicket("ws-ticket")).thenReturn(false);
+        handler.deliver(new ChatEvent("message.created", "conversation", "user-1", Map.of("content", "after-expiry")));
+        verify(session).close(CloseStatus.POLICY_VIOLATION);
+        verify(session, never()).sendMessage(any());
+    }
+
     private void authenticate() throws Exception {
         when(tokens.validateToken("valid")).thenReturn(true);
         when(tokens.getUserIdFromJWT("valid")).thenReturn("user-1");

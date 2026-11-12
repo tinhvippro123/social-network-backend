@@ -272,4 +272,8 @@ public class AuthService {
         String refreshToken = tokenProvider.generateRefreshTokenFromUserId(user.getId());
         return new AuthSessionResult(accessToken, refreshToken, JwtAuthenticationResponse.UserDto.fromEntity(user));
     }
+
+    public String createWebSocketTicket(String userId) {
+        return tokenProvider.generateWsTicketFromUserId(userId);
+    }
 }

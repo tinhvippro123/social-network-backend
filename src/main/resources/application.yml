@@ -8,10 +8,17 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:123456}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN:2}
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      keepalive-time: 300000
+      connection-timeout: 30000
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${JPA_DDL_AUTO:update}
     show-sql: false
     properties:
       hibernate:
@@ -23,6 +30,10 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
+      username: ${SPRING_DATA_REDIS_USERNAME:}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      ssl:
+        enabled: ${SPRING_DATA_REDIS_SSL:false}
 
   # ── File Upload ───────────────────────────
   servlet:
@@ -44,6 +55,7 @@ jwt:
   secret: ${JWT_SECRET:VietBlog2026SecretKeyForJWTTokenGenerationMustBeAtLeast256Bits}
   access-token-expiration: 86400000   # 24 hours
   refresh-token-expiration: 604800000 # 7 days
+  ws-ticket-expiration: ${JWT_WS_TICKET_EXPIRATION:3600000} # 1 hour
   cookie:
     access-name: ${JWT_ACCESS_COOKIE_NAME:vietblog_access_token}
     refresh-name: ${JWT_REFRESH_COOKIE_NAME:vietblog_refresh_token}

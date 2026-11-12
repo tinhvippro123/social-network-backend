@@ -110,5 +110,41 @@ class CookieAuthenticationIntegrationTest extends VietblogBackendApplicationTest
         List<String> cleared = logoutResult.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
         assertThat(cleared).hasSize(3).allSatisfy(h -> assertThat(h).contains("Max-Age=0"));
     }
+
+    @Test
+    void wsTicketRequiresAuthCannotAccessRestAndPublicHealthIsOpen() throws Exception {
+        mvc.perform(get("/api/public/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("UP"));
+
+        mvc.perform(post("/api/auth/ws-ticket"))
+                .andExpect(status().isUnauthorized());
+
+        MvcResult loginResult = mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"Password123!\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Cookie accessCookie = loginResult.getResponse().getCookie("vietblog_access_token");
+        assertThat(accessCookie).isNotNull();
+
+        MvcResult ticketResult = mvc.perform(post("/api/auth/ws-ticket").cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.ticket").isString())
+                .andReturn();
+
+        String body = ticketResult.getResponse().getContentAsString();
+        String ticket = body.replaceAll(".*\"ticket\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        assertThat(ticket).isNotBlank().isNotEqualTo(body);
+
+        // WS ticket must NOT authenticate REST endpoints
+        mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + ticket))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/auth/me").cookie(new Cookie("vietblog_access_token", ticket)))
+                .andExpect(status().isUnauthorized());
+    }
 }
 

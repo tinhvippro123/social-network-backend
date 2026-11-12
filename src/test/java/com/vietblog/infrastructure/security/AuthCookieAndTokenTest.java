@@ -24,6 +24,7 @@ class AuthCookieAndTokenTest {
                 "VietBlog2026SecretKeyForJWTTokenGenerationMustBeAtLeast256Bits");
         ReflectionTestUtils.setField(tokenProvider, "jwtExpirationInMs", 86_400_000L);
         ReflectionTestUtils.setField(tokenProvider, "refreshExpirationInMs", 604_800_000L);
+        ReflectionTestUtils.setField(tokenProvider, "wsTicketExpirationInMs", 3_600_000L);
 
         cookieService = new AuthCookieService(
                 "vietblog_access_token",
@@ -50,6 +51,20 @@ class AuthCookieAndTokenTest {
 
         assertThat(tokenProvider.getUserIdFromJWT(access)).isEqualTo("user-123");
         assertThat(tokenProvider.getUserIdFromJWT(refresh)).isEqualTo("user-123");
+    }
+
+    @Test
+    void wsTicketIsStrictlyIsolatedFromAccessAndRefreshTokens() {
+        String access = tokenProvider.generateTokenFromUserId("user-123");
+        String refresh = tokenProvider.generateRefreshTokenFromUserId("user-123");
+        String wsTicket = tokenProvider.generateWsTicketFromUserId("user-123");
+
+        assertThat(tokenProvider.validateWsTicket(wsTicket)).isTrue();
+        assertThat(tokenProvider.validateToken(wsTicket)).isFalse();
+        assertThat(tokenProvider.validateRefreshToken(wsTicket)).isFalse();
+        assertThat(tokenProvider.validateWsTicket(access)).isFalse();
+        assertThat(tokenProvider.validateWsTicket(refresh)).isFalse();
+        assertThat(tokenProvider.getUserIdFromJWT(wsTicket)).isEqualTo("user-123");
     }
 
     @Test

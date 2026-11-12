@@ -72,7 +72,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         try {
             Frame frame = json.readValue(text.getPayload(), Frame.class);
             if (client.userId() == null) {
-                if (!"auth".equals(frame.type()) || frame.token() == null || !validToken(frame.token())) {
+                if (!"auth".equals(frame.type()) || frame.token() == null || !validAuthToken(frame.token())) {
                     close(session, CloseStatus.POLICY_VIOLATION); return;
                 }
                 String userId = tokens.getUserIdFromJWT(frame.token());
@@ -117,8 +117,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private boolean validToken(String token) {
         try { return tokens.validateToken(token); } catch (RuntimeException ex) { return false; }
     }
+    private boolean validWsTicket(String token) {
+        try { return tokens.validateWsTicket(token); } catch (RuntimeException ex) { return false; }
+    }
+    private boolean validAuthToken(String token) {
+        return validToken(token) || validWsTicket(token);
+    }
     private boolean validClient(Client client) {
-        return validToken(client.token()) && users.findById(client.userId()).map(u -> u.isActive()).orElse(false);
+        return validAuthToken(client.token()) && users.findById(client.userId()).map(u -> u.isActive()).orElse(false);
     }
     private void send(WebSocketSession session, Object payload) throws IOException {
         synchronized (session) { if (session.isOpen()) session.sendMessage(new TextMessage(json.writeValueAsString(payload))); }
