@@ -50,6 +50,9 @@ public class SearchApplicationService {
     private final SearchFileReader files;
     private final SearchIndexGateway indexGateway;
 
+    @Autowired(required = false)
+    private SystemSettingsService systemSettingsService;
+
     @Autowired
     public SearchApplicationService(
             SearchPostRepository posts,
@@ -106,14 +109,19 @@ public class SearchApplicationService {
         validateLimit(limit);
         if (query == null || query.isBlank() || query.length() > 1000) throw invalid();
         if (!"keyword".equals(type) && !"semantic".equals(type)) throw invalid();
+        if ("semantic".equals(type) && systemSettingsService != null
+                && Boolean.FALSE.equals(systemSettingsService.getAll().get("enableSemanticSearch"))) {
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Tính năng tìm kiếm ngữ nghĩa đang tạm tắt");
+        }
         return textSearch(query, type, limit, viewerId);
     }
 
     private List<PostResponse> textSearch(String query, String type, int limit, String viewerId) {
         // Unaccented queries ("da lat", "tri tue nhan tao") are matched against diacritic-folded text
         // so users can search Vietnamese content without typing accents.
-        boolean allUnaccented = TextAlgorithms.isUnaccented(query);
-        boolean hasUnaccentedToken = TextAlgorithms.tokens(query).stream().anyMatch(TextAlgorithms::isUnaccented);
+        boolean queryHasDiacritics = !TextAlgorithms.isUnaccented(query);
+        boolean allUnaccented = !queryHasDiacritics;
+        boolean hasUnaccentedToken = !queryHasDiacritics && TextAlgorithms.tokens(query).stream().anyMatch(TextAlgorithms::isUnaccented);
         boolean widenForUnaccented = allUnaccented || hasUnaccentedToken;
         List<Post> corpus = "semantic".equals(type) ? semanticCorpus(query, limit, widenForUnaccented) : corpus();
         if (corpus.isEmpty()) return List.of();
@@ -223,6 +231,10 @@ public class SearchApplicationService {
 
     public List<PostResponse> nearby(double latitude, double longitude, double radiusKm, int limit, String viewerId) {
         validateLimit(limit);
+        if (systemSettingsService != null
+                && Boolean.FALSE.equals(systemSettingsService.getAll().get("enableLocationPosts"))) {
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Tính năng tìm kiếm theo vị trí đang tạm tắt");
+        }
         if (!Double.isFinite(latitude) || !Double.isFinite(longitude) || !Double.isFinite(radiusKm)
                 || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || radiusKm <= 0 || radiusKm > 500) throw invalid();
 

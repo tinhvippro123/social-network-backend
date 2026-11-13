@@ -7,6 +7,7 @@ import com.vietblog.domain.exception.DomainException;
 import com.vietblog.infrastructure.repository.UserRepository;
 import com.vietblog.infrastructure.security.AuthCookieService;
 import com.vietblog.infrastructure.security.JwtTokenProvider;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.validation.Validator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,19 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         this.tokens = tokens; this.users = users; this.service = service;
         this.json = json; this.validator = validator; this.cookieService = cookieService;
         expiry.scheduleWithFixedDelay(this::expireSessions, 10, 10, TimeUnit.SECONDS);
+    }
+
+    @PostConstruct
+    public void registerOnlineChecker() {
+        if (this.service != null) {
+            this.service.setOnlineChecker(this::isUserOnline);
+        }
+    }
+
+    public boolean isUserOnline(String userId) {
+        if (userId == null) return false;
+        return clients.values().stream()
+                .anyMatch(c -> userId.equals(c.userId()) && c.session() != null && c.session().isOpen());
     }
 
     public ChatWebSocketHandler(JwtTokenProvider tokens, UserRepository users, ChatService service,

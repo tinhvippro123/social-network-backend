@@ -28,6 +28,18 @@ public interface PostRepository extends JpaRepository<Post, String> {
     @Query("select p from Post p where p.status = 'PUBLISHED' and (p.category.id = :category or p.category.slug = :category) and (lower(p.title) like :pattern or lower(p.content) like :pattern)")
     Page<Post> findByCategoryAndKeyword(@Param("category") String category, @Param("pattern") String pattern, Pageable pageable);
 
+    @Query("select distinct p from Post p join p.tags t where p.status = 'PUBLISHED' and lower(t) = lower(:tag)")
+    Page<Post> findByTag(@Param("tag") String tag, Pageable pageable);
+
+    @Query("select distinct p from Post p join p.tags t where p.status = 'PUBLISHED' and (p.category.id = :category or p.category.slug = :category) and lower(t) = lower(:tag)")
+    Page<Post> findByCategoryAndTag(@Param("category") String category, @Param("tag") String tag, Pageable pageable);
+
+    @Query("select distinct p from Post p join p.tags t where p.status = 'PUBLISHED' and (lower(p.title) like :pattern or lower(p.content) like :pattern) and lower(t) = lower(:tag)")
+    Page<Post> findByKeywordAndTag(@Param("pattern") String pattern, @Param("tag") String tag, Pageable pageable);
+
+    @Query("select distinct p from Post p join p.tags t where p.status = 'PUBLISHED' and (p.category.id = :category or p.category.slug = :category) and (lower(p.title) like :pattern or lower(p.content) like :pattern) and lower(t) = lower(:tag)")
+    Page<Post> findByCategoryAndKeywordAndTag(@Param("category") String category, @Param("pattern") String pattern, @Param("tag") String tag, Pageable pageable);
+
     Page<Post> findByAuthorIdAndStatus(String authorId, Post.PostStatus status, Pageable pageable);
 
     Page<Post> findByCategoryIdAndStatus(String categoryId, Post.PostStatus status, Pageable pageable);

@@ -148,10 +148,16 @@ public class AuthService {
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         String tokenOrOtp = request.getToken().trim();
+        String emailFilter = (request.getEmail() != null && !request.getEmail().isBlank())
+                ? request.getEmail().trim()
+                : null;
 
-        Optional<PasswordResetToken> tokenOpt = resetTokenRepository.findByTokenAndUsedFalse(tokenOrOtp);
+        Optional<PasswordResetToken> tokenOpt = resetTokenRepository.findByTokenAndUsedFalse(tokenOrOtp)
+                .filter(t -> emailFilter == null || (t.getUser() != null && emailFilter.equalsIgnoreCase(t.getUser().getEmail())));
         if (tokenOpt.isEmpty()) {
-            tokenOpt = resetTokenRepository.findFirstByOtpAndUsedFalseOrderByExpiryDateDesc(tokenOrOtp);
+            tokenOpt = emailFilter != null
+                    ? resetTokenRepository.findFirstByOtpAndUserEmailIgnoreCaseAndUsedFalseOrderByExpiryDateDesc(tokenOrOtp, emailFilter)
+                    : resetTokenRepository.findFirstByOtpAndUsedFalseOrderByExpiryDateDesc(tokenOrOtp);
         }
 
         PasswordResetToken resetToken = tokenOpt
@@ -211,8 +217,12 @@ public class AuthService {
                 HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
                 if (httpResponse.statusCode() == 200) {
                     Map<?, ?> body = objectMapper.readValue(httpResponse.body(), Map.class);
+                    Object audObj = body.get("aud");
                     if (googleClientId != null && !googleClientId.isBlank()
-                            && !googleClientId.equals(String.valueOf(body.get("aud")))) {
+                            && audObj != null && !googleClientId.equals(String.valueOf(audObj))) {
+                        throw new BusinessRuleException(ErrorCode.UNAUTHORIZED);
+                    }
+                    if (Boolean.FALSE.equals(body.get("email_verified"))) {
                         throw new BusinessRuleException(ErrorCode.UNAUTHORIZED);
                     }
                     email = (String) body.get("email");
@@ -233,6 +243,10 @@ public class AuthService {
                     Map<?, ?> body = objectMapper.readValue(httpResponse.body(), Map.class);
                     if (googleClientId != null && !googleClientId.isBlank()
                             && !googleClientId.equals(String.valueOf(body.get("aud")))) {
+                        throw new BusinessRuleException(ErrorCode.UNAUTHORIZED);
+                    }
+                    if (Boolean.FALSE.equals(body.get("email_verified"))
+                            || "false".equalsIgnoreCase(String.valueOf(body.get("email_verified")))) {
                         throw new BusinessRuleException(ErrorCode.UNAUTHORIZED);
                     }
                     email = (String) body.get("email");

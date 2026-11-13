@@ -28,6 +28,21 @@ public class ChatService {
     private final ApplicationEventPublisher events;
     @PersistenceContext private EntityManager entityManager;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SystemSettingsService systemSettingsService;
+
+    private java.util.function.Predicate<String> onlineChecker = id -> false;
+
+    public void setOnlineChecker(java.util.function.Predicate<String> onlineChecker) {
+        this.onlineChecker = onlineChecker != null ? onlineChecker : id -> false;
+    }
+
+    private void requireChatEnabled() {
+        if (systemSettingsService != null && Boolean.FALSE.equals(systemSettingsService.getAll().get("enableRealTimeChat"))) {
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Tính năng chat thời gian thực đang tạm tắt");
+        }
+    }
+
     @Transactional(readOnly = true)
     public Page<ConversationResponse> conversations(String userId, int page, int limit) {
         GroupService.page(page, limit);
@@ -37,6 +52,7 @@ public class ChatService {
     }
 
     public ConversationResponse create(String userId, ConversationRequest request) {
+        requireChatEnabled();
         User creator = user(userId);
         Set<String> ids = new TreeSet<>(request.participantIds());
         ids.add(userId);
@@ -79,6 +95,7 @@ public class ChatService {
     }
 
     public MessageResponse send(String id, String userId, SendRequest request) {
+        requireChatEnabled();
         Conversation conversation = lock(id);
         ConversationMember sender = member(id, userId);
         if (!sender.getUser().isActive()) forbidden();
@@ -214,10 +231,13 @@ public class ChatService {
                 previewText = "[Tệp đính kèm]";
             }
         }
+        boolean isOnline = conversation.isGroupChat()
+                ? participants.stream().anyMatch(u -> !u.id().equals(viewer.getUser().getId()) && onlineChecker.test(u.id()))
+                : onlineChecker.test(other.id());
         return new ConversationResponse(conversation.getId(), displayName,
                 conversation.isGroupChat() ? null : other.avatar(), previewText,
                 latest == null ? conversation.getCreatedAt() : latest.getCreatedAt(),
-                messages.countUnread(conversation.getId(), viewer.getUser().getId(), viewer.getLastReadAt()), conversation.isGroupChat(), false,
+                messages.countUnread(conversation.getId(), viewer.getUser().getId(), viewer.getLastReadAt()), conversation.isGroupChat(), isOnline,
                 viewer.isPinned(), viewer.isMuted(), participants, nickname);
     }
 

@@ -12,13 +12,15 @@ public final class TextAlgorithms {
     private static final Pattern WORDS = Pattern.compile("[\\p{L}\\p{N}]+");
     private static final Set<String> POSITIVE = loadWords("/nlp/positive_words.txt", Set.of(
             "tốt", "hay", "đẹp", "thích", "yêu", "tuyệt", "vui", "đỉnh", "chuẩn", "xịn", "mê", "ngon", "giỏi", "pro",
-            "chất", "siêu", "bổ", "quý", "mượt", "nhanh", "sạch", "good", "great", "excellent", "love", "helpful",
+            "chất", "siêu", "bổ", "quý", "mượt", "mượt mà", "mặn mà", "ấn tượng", "tâm đắc", "tinh tế", "sâu sắc",
+            "nhanh", "sạch", "good", "great", "excellent", "love", "helpful",
             "awesome", "best", "amazing", "wonderful", "perfect", "fantastic", "super", "nice", "clean", "fast",
             "hay không tưởng", "đỉnh không tưởng", "tốt không tưởng", "đẹp không tưởng", "ngon không tưởng"
     ));
     private static final Set<String> NEGATIVE = loadWords("/nlp/offensive_words.txt", Set.of(
             "tệ", "xấu", "ghét", "buồn", "chán", "kém", "dở", "ngu", "dốt", "đần", "ngốc", "khùng", "điên", "rác",
             "nhảm", "tồi", "xàm", "lố", "hãm", "phế", "chó", "cút", "bậy", "láo", "ác", "lừa", "xạo", "nhục", "cùi",
+            "thất vọng", "nhàm chán", "kém cỏi",
             "ức", "bực", "bẩn", "bad", "awful", "hate", "terrible", "useless", "poor", "trash", "stupid", "idiot",
             "dumb", "horrible", "worst", "disgusting", "annoying", "fake", "scam", "cheat", "spam"
     ));
@@ -272,33 +274,48 @@ public final class TextAlgorithms {
         }
     }
 
+    private static boolean isContrastWord(List<String> words, int index) {
+        String w = words.get(index);
+        if (!CONTRAST.contains(w)) return false;
+        if ("mà".equals(w) && index > 0) {
+            String prev = words.get(index - 1);
+            if ("mượt".equals(prev) || "mặn".equals(prev)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Computes an L2-normalized 256-d sentiment word/n-gram embedding with negation & contrast handling. */
     public static double[] sentimentEmbedding(String text) {
         double[] embedding = new double[TEXT_VECTOR_DIMENSIONS];
-        List<String> words = tokens(text);
-        if (words.isEmpty()) return embedding;
+        String plain = plainText(text);
+        if (plain.isEmpty()) return embedding;
 
         boolean afterContrast = false;
-        for (int i = 0; i < words.size(); i++) {
-            String w = words.get(i);
-            if (CONTRAST.contains(w)) afterContrast = true;
-            if (STOP.contains(w) || NEGATION.contains(w)) continue;
+        for (String clause : plain.split("[,.;:!?()\\[\\]{}\"“”'‘’\\n]+")) {
+            List<String> words = tokens(clause);
+            for (int i = 0; i < words.size(); i++) {
+                String w = words.get(i);
+                if (isContrastWord(words, i)) afterContrast = true;
+                if (STOP.contains(w) || NEGATION.contains(w)) continue;
 
-            boolean doubleNegation = i >= 3 && NEGATION.contains(words.get(i - 3))
-                    && ("phải".equals(words.get(i - 2)) || "hề".equals(words.get(i - 2)))
-                    && NEGATION.contains(words.get(i - 1));
-            int polarity = 1;
-            if (!doubleNegation) {
-                int negCount = 0;
-                for (int j = Math.max(0, i - 2); j < i; j++) {
-                    if (NEGATION.contains(words.get(j))) negCount++;
+                boolean doubleNegation = i >= 3 && NEGATION.contains(words.get(i - 3))
+                        && ("phải".equals(words.get(i - 2)) || "hề".equals(words.get(i - 2)))
+                        && NEGATION.contains(words.get(i - 1));
+                int polarity = 1;
+                if (!doubleNegation) {
+                    int negCount = 0;
+                    for (int j = Math.max(0, i - 2); j < i; j++) {
+                        if (NEGATION.contains(words.get(j))) negCount++;
+                    }
+                    if (negCount % 2 == 1) polarity = -1;
                 }
-                if (negCount % 2 == 1) polarity = -1;
-            }
-            double weight = polarity * (afterContrast ? 2.0 : 1.0);
-            accumulateSignedHash(embedding, w, weight);
-            if (i + 1 < words.size() && !STOP.contains(words.get(i + 1)) && !NEGATION.contains(words.get(i + 1))) {
-                accumulateSignedHash(embedding, w + "_" + words.get(i + 1), 0.75 * weight);
+                double weight = polarity * (afterContrast ? 2.0 : 1.0);
+                accumulateSignedHash(embedding, w, weight);
+                if (i + 1 < words.size() && !STOP.contains(words.get(i + 1)) && !NEGATION.contains(words.get(i + 1))) {
+                    accumulateSignedHash(embedding, w + "_" + words.get(i + 1), 0.75 * weight);
+                }
             }
         }
         l2Normalize(embedding);
@@ -308,48 +325,51 @@ public final class TextAlgorithms {
     public record Sentiment(String label, double score, int positiveMatches, int negativeMatches, String algorithm) {}
 
     public static Sentiment sentiment(String text) {
-        List<String> words = tokens(text);
+        String plain = plainText(text);
         int positive = 0, negative = 0;
         int posWeight = 0, negWeight = 0;
         boolean afterContrast = false;
-        for (int i = 0; i < words.size(); i++) {
-            if (CONTRAST.contains(words.get(i))) {
-                afterContrast = true;
-            }
-            int sign = 0;
-            int matchedLen = 1;
-            for (int len = Math.min(4, words.size() - i); len >= 1; len--) {
-                String phrase = String.join(" ", words.subList(i, i + len));
-                if (POSITIVE.contains(phrase)) {
-                    sign = 1;
-                    matchedLen = len;
-                    break;
-                } else if (NEGATIVE.contains(phrase)) {
-                    sign = -1;
-                    matchedLen = len;
-                    break;
+        for (String clause : plain.split("[,.;:!?()\\[\\]{}\"“”'‘’\\n]+")) {
+            List<String> words = tokens(clause);
+            for (int i = 0; i < words.size(); i++) {
+                if (isContrastWord(words, i)) {
+                    afterContrast = true;
                 }
-            }
-            if (sign == 0) continue;
-            boolean doubleNegation = i >= 3 && NEGATION.contains(words.get(i - 3))
-                    && ("phải".equals(words.get(i - 2)) || "hề".equals(words.get(i - 2)))
-                    && NEGATION.contains(words.get(i - 1));
-            if (!doubleNegation) {
-                int negCount = 0;
-                for (int j = Math.max(0, i - 2); j < i; j++) {
-                    if (NEGATION.contains(words.get(j))) negCount++;
+                int sign = 0;
+                int matchedLen = 1;
+                for (int len = Math.min(4, words.size() - i); len >= 1; len--) {
+                    String phrase = String.join(" ", words.subList(i, i + len));
+                    if (POSITIVE.contains(phrase)) {
+                        sign = 1;
+                        matchedLen = len;
+                        break;
+                    } else if (NEGATIVE.contains(phrase)) {
+                        sign = -1;
+                        matchedLen = len;
+                        break;
+                    }
                 }
-                if (negCount % 2 == 1) sign = -sign;
+                if (sign == 0) continue;
+                boolean doubleNegation = i >= 3 && NEGATION.contains(words.get(i - 3))
+                        && ("phải".equals(words.get(i - 2)) || "hề".equals(words.get(i - 2)))
+                        && NEGATION.contains(words.get(i - 1));
+                if (!doubleNegation) {
+                    int negCount = 0;
+                    for (int j = Math.max(0, i - 2); j < i; j++) {
+                        if (NEGATION.contains(words.get(j))) negCount++;
+                    }
+                    if (negCount % 2 == 1) sign = -sign;
+                }
+                int weight = afterContrast ? 2 : 1;
+                if (sign > 0) {
+                    positive++;
+                    posWeight += weight;
+                } else {
+                    negative++;
+                    negWeight += weight;
+                }
+                i += matchedLen - 1;
             }
-            int weight = afterContrast ? 2 : 1;
-            if (sign > 0) {
-                positive++;
-                posWeight += weight;
-            } else {
-                negative++;
-                negWeight += weight;
-            }
-            i += matchedLen - 1;
         }
         if (posWeight + negWeight == 0) {
             return new Sentiment("neutral", 0.0, 0, 0, "lexicon+embedding-v1");

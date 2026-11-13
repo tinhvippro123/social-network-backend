@@ -35,11 +35,12 @@ public class PostController {
             @RequestParam(defaultValue = "10") int limit,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String tag,
             @RequestParam(defaultValue = "latest") String sort,
             @AuthenticationPrincipal UserPrincipal currentUser) {
 
         String viewerId = currentUser != null ? currentUser.getId() : null;
-        Page<PostResponse> postPage = postApplicationService.feed(page, limit, category, search, viewerId, sort);
+        Page<PostResponse> postPage = postApplicationService.feed(page, limit, category, search, viewerId, sort, tag);
 
         ApiResponse.Meta meta = new ApiResponse.Meta(page, limit, postPage.getTotalElements(), postPage.getTotalPages());
         ApiResponse<List<PostResponse>> response = ApiResponse.success(postPage.getContent(), "Lấy danh sách bài viết thành công");

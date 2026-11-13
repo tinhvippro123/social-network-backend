@@ -24,6 +24,6 @@ USER spring:spring
 COPY --from=build /app/app.jar app.jar
 
 EXPOSE 8080
-ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:+UseSerialGC -Xms64m -Xmx200m -XX:MaxMetaspaceSize=128m -Xss384k -XX:ReservedCodeCacheSize=32m -XX:MaxDirectMemorySize=32m"
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:+UseSerialGC -Xms64m -Xmx512m -XX:MaxMetaspaceSize=128m -Xss384k -XX:ReservedCodeCacheSize=32m -XX:MaxDirectMemorySize=64m"
 ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
 

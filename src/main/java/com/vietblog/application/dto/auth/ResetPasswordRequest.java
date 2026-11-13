@@ -17,4 +17,11 @@ public class ResetPasswordRequest {
     @NotBlank(message = "Mật khẩu mới không được để trống")
     @Size(min = 8, message = "Mật khẩu mới phải có ít nhất 8 ký tự")
     private String newPassword;
+
+    private String email;
+
+    public ResetPasswordRequest(String token, String newPassword) {
+        this.token = token;
+        this.newPassword = newPassword;
+    }
 }

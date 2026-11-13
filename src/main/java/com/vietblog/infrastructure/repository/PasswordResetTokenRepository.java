@@ -13,6 +13,7 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
     Optional<PasswordResetToken> findByTokenAndUsedFalse(String token);
     Optional<PasswordResetToken> findByOtpAndUsedFalse(String otp);
     Optional<PasswordResetToken> findFirstByOtpAndUsedFalseOrderByExpiryDateDesc(String otp);
+    Optional<PasswordResetToken> findFirstByOtpAndUserEmailIgnoreCaseAndUsedFalseOrderByExpiryDateDesc(String otp, String email);
     Optional<PasswordResetToken> findFirstByUserAndUsedFalseOrderByExpiryDateDesc(User user);
     List<PasswordResetToken> findByUserAndUsedFalse(User user);
 }

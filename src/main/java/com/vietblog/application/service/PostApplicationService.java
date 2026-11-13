@@ -228,7 +228,7 @@ public class PostApplicationService {
 
     @Transactional
     public PostResponse getPostById(String id, String viewerId, boolean trackView) {
-        Post post = postRepository.findLockedById(id)
+        Post post = (trackView ? postRepository.findLockedById(id) : postRepository.findById(id))
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
 
         if (post.getStatus() != Post.PostStatus.PUBLISHED) {
@@ -350,11 +350,18 @@ public class PostApplicationService {
 
     @Transactional(readOnly = true)
     public Page<PostResponse> feed(int page, int limit, String category, String query, String viewerId, String sort) {
+        return feed(page, limit, category, query, viewerId, sort, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PostResponse> feed(int page, int limit, String category, String query, String viewerId, String sort, String tag) {
         validatePage(page, limit);
         if (query != null && query.length() > 1000) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
 
         boolean hasCategory = category != null && !category.isBlank() && !"all".equalsIgnoreCase(category.trim());
         boolean hasQuery = query != null && !query.trim().isBlank();
+        String normalizedTag = tag == null ? "" : tag.trim().replaceFirst("^#+", "").trim();
+        boolean hasTag = !normalizedTag.isEmpty();
         Sort sortSpec = Sort.by(Sort.Direction.DESC, "createdAt", "id");
         if ("trending".equalsIgnoreCase(sort)) {
             sortSpec = Sort.by(Sort.Direction.DESC, "trendingScore", "viewsCount", "id");
@@ -364,14 +371,22 @@ public class PostApplicationService {
         PageRequest pageRequest = PageRequest.of(page - 1, limit, sortSpec);
 
         Page<Post> postPage;
-        if (hasCategory && hasQuery) {
+        if (hasTag && !hasCategory && !hasQuery) {
+            postPage = postRepository.findByTag(normalizedTag, pageRequest);
+        } else if (hasTag && hasCategory && !hasQuery) {
+            postPage = postRepository.findByCategoryAndTag(category.trim(), normalizedTag, pageRequest);
+        } else if (hasCategory && hasQuery) {
             String pattern = "%" + query.trim().toLowerCase() + "%";
-            postPage = postRepository.findByCategoryAndKeyword(category.trim(), pattern, pageRequest);
+            postPage = hasTag
+                    ? postRepository.findByCategoryAndKeywordAndTag(category.trim(), pattern, normalizedTag, pageRequest)
+                    : postRepository.findByCategoryAndKeyword(category.trim(), pattern, pageRequest);
         } else if (hasCategory) {
             postPage = postRepository.findByCategory(category.trim(), pageRequest);
         } else if (hasQuery) {
             String pattern = "%" + query.trim().toLowerCase() + "%";
-            postPage = postRepository.findByKeyword(pattern, pageRequest);
+            postPage = hasTag
+                    ? postRepository.findByKeywordAndTag(pattern, normalizedTag, pageRequest)
+                    : postRepository.findByKeyword(pattern, pageRequest);
         } else {
             postPage = postRepository.findByStatus(Post.PostStatus.PUBLISHED, pageRequest);
         }
