@@ -362,3 +362,74 @@ hay không tưởng
 tốt không tưởng
 đẹp không tưởng
 ngon không tưởng
+
+# --- UIT-VSFC (train split) Vietnamese evaluative positive phrases ---
+bám sát
+chuẩn bị kỹ
+chỉn chu
+có hứng thú
+có tâm
+cải thiện tốt
+cặn kẽ
+cởi mở
+dí dỏm
+dạy hay
+dạy kỹ
+dạy nhiệt
+dạy tốt
+dễ gần
+dễ hiểu
+dễ nghe
+dễ nắm bắt
+dễ theo dõi
+dễ tiếp thu
+giúp đỡ
+giải thích rõ
+giải đáp
+giảng hay
+giảng kỹ
+giảng tốt
+hiền lành
+hiểu bài
+hiểu rõ
+hài hước
+hòa nhã
+hướng dẫn chi tiết
+hướng dẫn kỹ
+hỗ trợ nhiệt tình
+hỗ trợ tốt
+hứng thú
+khách quan
+khích lệ
+lôi cuốn
+lưu loát
+mượt mà
+mạch lạc
+mặn mà
+nghiêm túc
+nhiệt huyết
+nắm bắt được
+nắm vững
+quan tâm
+rất chi tiết
+rất kỹ
+sinh động
+sôi nổi
+súc tích
+thiết thực
+thu hút
+thỏa đáng
+truyền đạt tốt
+trọng tâm
+tâm huyết
+tâm đắc
+tạo hứng thú
+tạo điều kiện
+tận tình
+tận tụy
+tốt bụng
+vui tính
+đáng học hỏi
+đầy đủ
+động viên
+ứng dụng cao

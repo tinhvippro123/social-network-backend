@@ -17,15 +17,20 @@ public final class TextAlgorithms {
             "awesome", "best", "amazing", "wonderful", "perfect", "fantastic", "super", "nice", "clean", "fast",
             "hay không tưởng", "đỉnh không tưởng", "tốt không tưởng", "đẹp không tưởng", "ngon không tưởng"
     ));
-    private static final Set<String> NEGATIVE = loadWords("/nlp/offensive_words.txt", Set.of(
-            "tệ", "xấu", "ghét", "buồn", "chán", "kém", "dở", "ngu", "dốt", "đần", "ngốc", "khùng", "điên", "rác",
-            "nhảm", "tồi", "xàm", "lố", "hãm", "phế", "chó", "cút", "bậy", "láo", "ác", "lừa", "xạo", "nhục", "cùi",
-            "thất vọng", "nhàm chán", "kém cỏi",
-            "ức", "bực", "bẩn", "bad", "awful", "hate", "terrible", "useless", "poor", "trash", "stupid", "idiot",
-            "dumb", "horrible", "worst", "disgusting", "annoying", "fake", "scam", "cheat", "spam"
-    ));
+    private static final Set<String> NEGATIVE = loadWords(
+            List.of("/nlp/negative_words.txt", "/nlp/offensive_words.txt"),
+            Set.of(
+                    "tệ", "xấu", "ghét", "buồn", "chán", "kém", "dở", "ngu", "dốt", "đần", "ngốc", "khùng", "điên", "rác",
+                    "nhảm", "tồi", "xàm", "lố", "hãm", "phế", "chó", "cút", "bậy", "láo", "ác", "lừa", "xạo", "nhục", "cùi",
+                    "thất vọng", "nhàm chán", "kém cỏi",
+                    "ức", "bực", "bẩn", "bad", "awful", "hate", "terrible", "useless", "poor", "trash", "stupid", "idiot",
+                    "dumb", "horrible", "worst", "disgusting", "annoying", "fake", "scam", "cheat", "spam"
+            )
+    );
     private static final Set<String> NEGATION = Set.of("không", "chẳng", "chưa", "hổng", "chả", "not", "never", "no");
     private static final Set<String> CONTRAST = Set.of("nhưng", "tuy", "song", "mà", "ngược");
+    // Polite imperative idioms whose leading token would otherwise match an affective word
+    private static final Set<String> NEUTRAL_IDIOMS = Set.of("vui lòng");
     private static final Set<String> STOP = buildStopwords();
     private static final double[] POSITIVE_PROTOTYPE = buildLexiconPrototype(POSITIVE);
     private static final double[] NEGATIVE_PROTOTYPE = buildLexiconPrototype(NEGATIVE);
@@ -56,20 +61,26 @@ public final class TextAlgorithms {
     }
 
     private static Set<String> loadWords(String resourcePath, Set<String> fallback) {
+        return loadWords(List.of(resourcePath), fallback);
+    }
+
+    private static Set<String> loadWords(List<String> resourcePaths, Set<String> fallback) {
         Set<String> set = new HashSet<>(fallback);
-        try (var is = TextAlgorithms.class.getResourceAsStream(resourcePath)) {
-            if (is != null) {
-                try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        line = line.trim();
-                        if (line.isEmpty() || line.startsWith("#")) continue;
-                        set.add(Normalizer.normalize(line, Normalizer.Form.NFC).toLowerCase(Locale.ROOT));
+        for (String resourcePath : resourcePaths) {
+            try (var is = TextAlgorithms.class.getResourceAsStream(resourcePath)) {
+                if (is != null) {
+                    try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            line = line.trim();
+                            if (line.isEmpty() || line.startsWith("#")) continue;
+                            set.add(Normalizer.normalize(line, Normalizer.Form.NFC).toLowerCase(Locale.ROOT));
+                        }
                     }
                 }
+            } catch (Exception ignored) {
+                // keep accumulated fallback/words
             }
-        } catch (Exception ignored) {
-            // keep fallback
         }
         return Collections.unmodifiableSet(set);
     }
@@ -339,7 +350,10 @@ public final class TextAlgorithms {
                 int matchedLen = 1;
                 for (int len = Math.min(4, words.size() - i); len >= 1; len--) {
                     String phrase = String.join(" ", words.subList(i, i + len));
-                    if (POSITIVE.contains(phrase)) {
+                    if (NEUTRAL_IDIOMS.contains(phrase)) {
+                        matchedLen = len;
+                        break;
+                    } else if (POSITIVE.contains(phrase)) {
                         sign = 1;
                         matchedLen = len;
                         break;
@@ -349,7 +363,10 @@ public final class TextAlgorithms {
                         break;
                     }
                 }
-                if (sign == 0) continue;
+                if (sign == 0) {
+                    i += matchedLen - 1;
+                    continue;
+                }
                 boolean doubleNegation = i >= 3 && NEGATION.contains(words.get(i - 3))
                         && ("phải".equals(words.get(i - 2)) || "hề".equals(words.get(i - 2)))
                         && NEGATION.contains(words.get(i - 1));

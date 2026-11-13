@@ -1,0 +1,298 @@
+# Vietnamese & English general negative evaluative lexicon
+# Combines general Vietnamese evaluative terms + UIT-VSFC (train split) constructive negative phrases.
+# Vulgar/offensive profanity remains separated in offensive_words.txt.
+
+# --- Core Negative Sentiment & Quality ---
+tệ
+tệ hại
+tồi
+tồi tệ
+xấu
+xấu xí
+ghét
+buồn
+buồn ngủ
+chán
+nhàm chán
+hơi chán
+quá chán
+chán nản
+nản lòng
+kém
+quá kém
+kém cỏi
+yếu kém
+còn yếu
+kém chất lượng
+dở
+dở tệ
+rác
+rác rưởi
+nhảm
+nhảm nhí
+nội dung nhảm
+vớ vẩn
+chém gió
+linh tinh
+ức
+ức chế
+gây ức chế
+bực
+bực mình
+bẩn
+thất vọng
+lừa
+lừa đảo
+đạo văn
+xạo
+giả tạo
+rẻ tiền
+vô văn hóa
+mất dạy
+kinh khủng
+nguy hiểm
+tổn hại
+thiệt hại
+thiệt thòi
+bức xúc
+bất ổn
+gián đoạn
+bad
+awful
+hate
+terrible
+useless
+poor
+trash
+stupid
+idiot
+dumb
+horrible
+worst
+disgusting
+annoying
+fake
+scam
+cheat
+spam
+
+# --- Difficulty, Confusion & Clarity Deficits ---
+khó
+quá khó
+hơi khó
+rất khó
+khó hiểu
+khó tiếp thu
+khó theo dõi
+khó theo kịp
+khó nắm bắt
+khó khăn
+khó chịu
+khó tính
+khó dùng
+khó nghe
+khó nhìn
+khó đọc
+khó nhớ
+khó làm
+rối
+rối rắm
+rối mù
+mơ hồ
+chung chung
+trừu tượng
+lủng củng
+rời rạc
+lan man
+dài dòng
+rườm rà
+chậm hiểu
+không hiểu
+chưa hiểu
+chả hiểu
+chẳng hiểu
+không rõ
+chưa rõ
+không rõ ràng
+chưa rõ ràng
+không kịp
+chưa kịp
+không theo kịp
+
+# --- Pace, Delivery & Completeness Deficits ---
+nói nhanh
+dạy nhanh
+giảng nhanh
+hơi nhanh
+quá nhanh
+đi nhanh
+lướt nhanh
+qua nhanh
+chậm
+quá chậm
+hơi chậm
+chậm chạp
+nói nhỏ
+giọng nhỏ
+hơi nhỏ
+quá nhỏ
+chữ nhỏ
+bé quá
+khô khan
+chép bảng
+đọc slide
+nhìn slide
+đọc chép
+sơ sài
+hời hợt
+qua loa
+cẩu thả
+thiếu
+còn thiếu
+thiếu sót
+thiếu thốn
+thiếu trách nhiệm
+vô trách nhiệm
+thiếu thực tế
+thiếu ví dụ
+thiếu nhiệt tình
+thiếu chuyên nghiệp
+thiếu tập trung
+thiếu tương tác
+quá ít
+hơi ít
+còn ít
+rất ít
+ít thực hành
+ít ví dụ
+ít tương tác
+ít bài tập
+không đủ
+chưa đủ
+chưa tốt
+chưa ổn
+không ổn
+chưa đạt
+chưa chi tiết
+không chi tiết
+chưa đầy đủ
+không đầy đủ
+chưa hợp lý
+không hợp lý
+bất hợp lý
+chưa phù hợp
+không phù hợp
+chưa hiệu quả
+không hiệu quả
+kém hiệu quả
+không hài lòng
+chưa hài lòng
+không công bằng
+thiên vị
+bất công
+không đáp ứng
+chưa đáp ứng
+không đảm bảo
+chưa đảm bảo
+không sát
+chưa sát
+chưa sâu
+chưa kỹ
+không kỹ
+chưa cụ thể
+không cụ thể
+còn hạn chế
+nhiều hạn chế
+bị hạn chế
+bất cập
+bất tiện
+phiền phức
+tốn thời gian
+lãng phí
+mất thời gian
+
+# --- Technical / Facility / Tardiness / Overload ---
+lỗi thời
+cũ kỹ
+xuống cấp
+hư hỏng
+hỏng hóc
+bị hư
+hư
+hỏng
+giật lag
+nhiều lỗi
+bị lỗi
+lỗi nhiều
+lỗi quá
+gặp lỗi
+phát sinh lỗi
+sai sót
+sai lệch
+sai bét
+nhầm lẫn
+lộn xộn
+đi trễ
+vào trễ
+trễ giờ
+chậm trễ
+trễ hẹn
+trễ deadline
+làm biếng
+lười
+lười biếng
+nghỉ dạy
+nghỉ nhiều
+cúp tiết
+bỏ tiết
+không thông báo
+quá tải
+nặng nề
+áp lực
+căng thẳng
+quá nhiều
+quá dài
+quá đông
+chật chội
+chật hẹp
+ồn ào
+nóng bức
+tối tăm
+nhồi nhét
+lệch lạc
+
+# --- Constructive Improvement Directives (UIT-VSFC train patterns) ---
+cần cải thiện
+nên cải thiện
+cần khắc phục
+nên khắc phục
+cần sửa
+nên sửa
+cần thay đổi
+nên thay đổi
+cần xem lại
+nên xem lại
+cần xem xét
+nên xem xét
+cần nâng cấp
+nên nâng cấp
+cần bổ sung
+nên bổ sung
+cần cập nhật
+nên cập nhật
+cần giảm
+nên giảm
+cần giảm tải
+cần thêm
+nên thêm
+cần tăng
+nên tăng
+nên cho
+cần cho
+cần có
+nên có
+cần chú ý
+nên chú ý
+đề nghị
+coi lại
+
