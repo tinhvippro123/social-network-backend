@@ -1,6 +1,8 @@
 package com.vietblog.infrastructure.config;
 
+import com.vietblog.application.service.SystemSettingsService;
 import com.vietblog.infrastructure.security.JwtAuthenticationFilter;
+import com.vietblog.infrastructure.security.MaintenanceModeFilter;
 import com.vietblog.infrastructure.security.RateLimitingFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +34,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitingFilter rateLimitingFilter;
+    private final SystemSettingsService systemSettingsService;
 
     @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:5174,http://localhost:3000}")
     private String allowedOrigins = "http://localhost:5173,http://localhost:5174,http://localhost:3000";
@@ -76,7 +79,8 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(rateLimitingFilter, JwtAuthenticationFilter.class);
+            .addFilterAfter(rateLimitingFilter, JwtAuthenticationFilter.class)
+            .addFilterAfter(new MaintenanceModeFilter(systemSettingsService), RateLimitingFilter.class);
 
         return http.build();
     }

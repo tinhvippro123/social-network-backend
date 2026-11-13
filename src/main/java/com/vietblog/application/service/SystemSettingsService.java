@@ -45,6 +45,13 @@ public class SystemSettingsService {
         return result;
     }
 
+    @Transactional(readOnly = true)
+    public boolean isMaintenanceMode() {
+        return repository.findById("maintenanceMode")
+                .map(s -> Boolean.parseBoolean(s.getValue()))
+                .orElse(Boolean.TRUE.equals(DEFAULTS.get("maintenanceMode")));
+    }
+
     @Transactional
     public Map<String, Object> update(Map<String, Object> changes) {
         if (changes != null) {

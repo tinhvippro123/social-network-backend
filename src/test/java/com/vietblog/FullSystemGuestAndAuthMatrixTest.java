@@ -622,6 +622,30 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
                         .content("{\"allowRegistration\":true}"))
                 .andExpect(status().isOk());
 
+        // Maintenance mode blocks public & regular user traffic with 503 while preserving Admin, auth & health
+        mvc.perform(put("/api/admin/settings")
+                        .cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maintenanceMode\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.maintenanceMode").value(true));
+
+        mvc.perform(get("/api/posts"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("MAINTENANCE_MODE"));
+        mvc.perform(get("/api/posts").cookie(peerCookie))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("MAINTENANCE_MODE"));
+        mvc.perform(get("/api/public/health")).andExpect(status().isOk());
+        mvc.perform(get("/api/posts").cookie(adminCookie)).andExpect(status().isOk());
+        mvc.perform(put("/api/admin/settings")
+                        .cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maintenanceMode\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.maintenanceMode").value(false));
+        mvc.perform(get("/api/posts")).andExpect(status().isOk());
+
         // Category CRUD as ADMIN
         MvcResult catRes = mvc.perform(post("/api/categories")
                         .cookie(adminCookie)
