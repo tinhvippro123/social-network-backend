@@ -22,8 +22,19 @@ public class GroupService {
     private final HtmlSanitizer htmlSanitizer;
 
     @Transactional(readOnly = true)
-    public Page<GroupResponse> list(String userId, boolean joined, String query, int page, int limit) {
-        return groups.search(userId, joined, query == null ? "" : query.trim(), page(page, limit)).map(g -> response(g, userId));
+    public Page<GroupResponse> list(String viewerId, boolean joined, String query, int page, int limit) {
+        return list(viewerId, null, joined, query, page, limit);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<GroupResponse> list(String viewerId, String targetUserId, boolean joined, String query, int page, int limit) {
+        String effectiveTargetId = (targetUserId != null && !targetUserId.isBlank()) ? targetUserId : viewerId;
+        if (joined && (effectiveTargetId == null || effectiveTargetId.isBlank())) {
+            return Page.empty(page(page, limit));
+        }
+        boolean publicOnly = joined && !effectiveTargetId.equals(viewerId) && !isSystemMod(viewerId);
+        return groups.search(effectiveTargetId, joined, publicOnly, query == null ? "" : query.trim(), page(page, limit))
+                .map(g -> response(g, viewerId));
     }
 
     @Transactional(readOnly = true)

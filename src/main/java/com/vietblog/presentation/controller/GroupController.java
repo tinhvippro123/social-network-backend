@@ -25,14 +25,15 @@ public class GroupController {
     public ApiResponse<List<GroupResponse>> list(
             @AuthenticationPrincipal UserPrincipal user,
             @RequestParam(defaultValue = "false") boolean joined,
+            @RequestParam(required = false) String userId,
             @RequestParam(defaultValue = "") String q,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
-        String userId = user != null ? user.getId() : "";
-        if (joined && (userId == null || userId.isBlank())) {
+        String viewerId = user != null ? user.getId() : "";
+        if (joined && (userId == null || userId.isBlank()) && (viewerId == null || viewerId.isBlank())) {
             return paged(Page.empty());
         }
-        return paged(service.list(userId, joined, q, page, limit));
+        return paged(service.list(viewerId, userId, joined, q, page, limit));
     }
 
     @GetMapping("/{id}")

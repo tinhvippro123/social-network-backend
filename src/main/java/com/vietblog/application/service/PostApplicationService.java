@@ -223,6 +223,11 @@ public class PostApplicationService {
 
     @Transactional
     public PostResponse getPostById(String id, String viewerId) {
+        return getPostById(id, viewerId, true);
+    }
+
+    @Transactional
+    public PostResponse getPostById(String id, String viewerId, boolean trackView) {
         Post post = postRepository.findLockedById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
 
@@ -234,7 +239,7 @@ public class PostApplicationService {
             if (!isAuthor && !isAdminOrMod) {
                 throw new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND);
             }
-        } else {
+        } else if (trackView) {
             post.setViewsCount(post.getViewsCount() + 1);
             postDomainService.calculateTrendingScore(post);
             postRepository.save(post);

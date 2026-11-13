@@ -39,6 +39,15 @@ class SearchAlgorithmsTest {
         assertThat(TextAlgorithms.sentiment("not bad").label()).isEqualTo("positive");
         assertThat(TextAlgorithms.sentiment("ngu").label()).isEqualTo("negative");
         assertThat(TextAlgorithms.sentiment("không ngu").label()).isEqualTo("positive");
+        assertThat(TextAlgorithms.sentiment("Tưởng không hay nhưng lại hay không tưởng").label()).isEqualTo("positive");
+        assertThat(TextAlgorithms.sentiment("Bài viết không phải không hay").label()).isEqualTo("positive");
+        assertThat(TextAlgorithms.sentiment("Bài viết rất hay và bổ ích").algorithm()).isEqualTo("lexicon+embedding-v1");
+        double[] sentVec = TextAlgorithms.sentimentEmbedding("Bài viết rất hay và bổ ích");
+        double sentNorm = 0;
+        for (double v : sentVec) sentNorm += v * v;
+        assertThat(sentVec).hasSize(TextAlgorithms.TEXT_VECTOR_DIMENSIONS);
+        assertThat(Math.sqrt(sentNorm)).isCloseTo(1.0, within(1e-9));
+        assertThat(TextAlgorithms.plainText("<p>Chào &quot;Việt Blog&quot; &#39;2026&#39;</p>")).isEqualTo("Chào \"Việt Blog\" '2026'");
         assertThat(TextAlgorithms.sentiment("Java version 17").score()).isZero();
     }
 

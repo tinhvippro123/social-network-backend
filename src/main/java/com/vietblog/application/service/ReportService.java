@@ -42,10 +42,16 @@ public class ReportService {
     private final CategoryRepository categories;
     private final PostDomainService postDomainService;
     private PostApplicationService postApplicationService;
+    private SystemSettingsService systemSettingsService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setPostApplicationService(PostApplicationService postApplicationService) {
         this.postApplicationService = postApplicationService;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSystemSettingsService(SystemSettingsService systemSettingsService) {
+        this.systemSettingsService = systemSettingsService;
     }
 
     @Transactional
@@ -57,7 +63,37 @@ public class ReportService {
         }
         Report report = Report.builder().reporter(reporter).targetId(request.targetId()).type(request.type())
                 .targetTitle(title).reason(request.reason().trim()).description(request.description()).build();
-        return toResponse(reports.save(report));
+        Report saved = reports.save(report);
+        if (request.type() == Report.TargetType.POST && systemSettingsService != null) {
+            Object rawThreshold = systemSettingsService.getAll().get("autoHideReportThreshold");
+            int threshold = rawThreshold instanceof Number n ? n.intValue() : 10;
+            if (threshold > 0) {
+                long pendingCount = reports.countByTypeAndTargetIdAndStatus(
+                        Report.TargetType.POST, request.targetId(), Report.ReportStatus.PENDING);
+                if (pendingCount >= threshold) {
+                    posts.findById(request.targetId()).ifPresent(post -> {
+                        if (post.getStatus() == Post.PostStatus.PUBLISHED) {
+                            post.setStatus(Post.PostStatus.HIDDEN);
+                            posts.save(post);
+                            if (post.getAuthor() != null) {
+                                post.getAuthor().setPostsCount(Math.max(0, post.getAuthor().getPostsCount() - 1));
+                                users.save(post.getAuthor());
+                            }
+                            if (post.getCategory() != null) {
+                                post.getCategory().setPostsCount(Math.max(0, post.getCategory().getPostsCount() - 1));
+                                if (categories != null) {
+                                    categories.save(post.getCategory());
+                                }
+                            }
+                            if (postApplicationService != null) {
+                                postApplicationService.refreshSearchIndexAndCaches(post);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        return toResponse(saved);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
@@ -210,10 +246,13 @@ public class ReportService {
                         postDomainService.calculateTrendingScore(post);
                     }
                     posts.save(post);
+                    if (postApplicationService != null) postApplicationService.refreshSearchIndexAndCaches(post);
                 }
             });
             case GROUP -> {
-                if (actor.getRole() != User.Role.ADMIN) throw new ForbiddenException(ErrorCode.FORBIDDEN);
+                if (actor.getRole() != User.Role.ADMIN && actor.getRole() != User.Role.MODERATOR) {
+                    throw new ForbiddenException(ErrorCode.FORBIDDEN);
+                }
                 if (groups.existsById(report.getTargetId())) {
                     groupService.delete(report.getTargetId(), actor.getId());
                 }
