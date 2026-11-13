@@ -50,8 +50,9 @@ public class PostController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<PostResponse>> getPostById(@PathVariable String id,
+            @RequestParam(defaultValue = "true") boolean trackView,
             @AuthenticationPrincipal UserPrincipal user) {
-        PostResponse response = postApplicationService.getPostById(id, user == null ? null : user.getId());
+        PostResponse response = postApplicationService.getPostById(id, user == null ? null : user.getId(), trackView);
         return ResponseEntity.ok(ApiResponse.success(response, "Lấy bài viết thành công"));
     }
 

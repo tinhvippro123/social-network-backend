@@ -14,7 +14,6 @@ caidauboi
 dau boy
 dauboy
 caidauboy
-b`
 ###############################
 # Cặc, and its variants
 cặc
@@ -52,9 +51,7 @@ dek
 đệt
 đách
 dech
-đ'
 deo
-d'
 đel
 đél
 del
@@ -186,11 +183,9 @@ dou ma
 ###############################
 # Đĩ, and its variants
 đĩ
-di~
 đuỹ
 điếm
 cđĩ
-cdi~
 đilol
 điloz
 đilon
@@ -198,7 +193,6 @@ diloz
 dilol
 dilon
 condi
-condi~
 dime
 di me
 dimemay
@@ -206,7 +200,6 @@ condime
 condimay
 condimemay
 con di cho
-con di cho'
 condicho
 bitch
 biz
@@ -216,11 +209,9 @@ con bic
 con bíc
 con bít
 phò
-4`
 ###############################
 # Lồn, and its variants
 lồn
-l`
 loz
 lìn
 nulo
@@ -349,7 +340,6 @@ vleu
 chịch
 chich
 vãi
-v~
 nứng
 nug
 đút đít
@@ -380,7 +370,6 @@ chó má
 cờ hó
 sảng
 thằng chó
-thang cho'
 thang cho
 chó điên
 thằng điên

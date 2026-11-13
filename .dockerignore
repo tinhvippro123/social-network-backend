@@ -1,0 +1,15 @@
+.gradle/
+build/
+bin/
+out/
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+*.log
+.idea/
+.vscode/
+src/test/
+

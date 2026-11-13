@@ -271,6 +271,7 @@ public class AdminService {
                         postDomainService.calculateTrendingScore(p);
                     }
                     posts.save(p);
+                    postApplicationService.refreshSearchIndexAndCaches(p);
                 });
             }
         }
