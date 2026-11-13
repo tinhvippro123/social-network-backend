@@ -1,6 +1,7 @@
 package com.vietblog.application.dto.auth;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.vietblog.application.dto.user.UserPreferencesDto;
 import com.vietblog.domain.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -31,6 +32,8 @@ public class JwtAuthenticationResponse {
         private int postsCount;
         private int followersCount;
         private int followingCount;
+        private boolean emailVerified;
+        private UserPreferencesDto preferences;
 
         public static UserDto fromEntity(User user) {
             return new UserDto(
@@ -43,7 +46,9 @@ public class JwtAuthenticationResponse {
                 user.getJoinedAt(),
                 user.getPostsCount(),
                 user.getFollowersCount(),
-                user.getFollowingCount()
+                user.getFollowingCount(),
+                user.isEmailVerifiedEffective(),
+                UserPreferencesDto.fromEntity(user)
             );
         }
     }

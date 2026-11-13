@@ -106,7 +106,15 @@ public class ExtendedDataSeeder implements CommandLineRunner {
         LocalDateTime now = LocalDateTime.now();
 
         for (UserSeed seed : CommunityAndSocialCatalog.users()) {
-            User user = userRepository.findByEmail(seed.email()).orElseGet(User::new);
+            User existing = userRepository.findByEmail(seed.email()).orElse(null);
+            if (existing != null && !refreshDates) {
+                if (existing.getEmailVerified() == null) {
+                    existing.setEmailVerified(true);
+                    userRepository.save(existing);
+                }
+                continue;
+            }
+            User user = existing != null ? existing : new User();
             user.setEmail(seed.email());
             user.setName(seed.name());
             user.setPassword(encodedDefaultPwd);
@@ -114,6 +122,7 @@ public class ExtendedDataSeeder implements CommandLineRunner {
             user.setBio(seed.bio());
             user.setRole(seed.role());
             user.setActive(true);
+            user.setEmailVerified(true);
             if (refreshDates || user.getJoinedAt() == null) {
                 LocalDateTime joined = seed.joinedDaysAgo() == 0
                         ? now.minusHours(2)
@@ -126,8 +135,15 @@ public class ExtendedDataSeeder implements CommandLineRunner {
 
         for (String studentEmail : PRESERVED_ADMIN_EMAILS) {
             userRepository.findByEmail(studentEmail).ifPresent(student -> {
-                student.setRole(User.Role.ADMIN);
-                student.setActive(true);
+                if (refreshDates || student.getRole() != User.Role.ADMIN) {
+                    student.setRole(User.Role.ADMIN);
+                }
+                if (refreshDates) {
+                    student.setActive(true);
+                }
+                if (student.getEmailVerified() == null) {
+                    student.setEmailVerified(true);
+                }
                 if (student.getAvatar() == null || student.getAvatar().isBlank()) {
                     student.setAvatar("https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80");
                 }

@@ -14,6 +14,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Stri
     long countByUserIdAndIsReadFalse(String userId);
     Page<Notification> findByUserId(String userId, Pageable pageable);
     Page<Notification> findByUserIdAndIsReadFalse(String userId, Pageable pageable);
+    boolean existsByUserIdAndTypeAndLink(String userId, Notification.NotificationType type, String link);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Notification n set n.isRead = true where n.id = :id and n.user.id = :userId")

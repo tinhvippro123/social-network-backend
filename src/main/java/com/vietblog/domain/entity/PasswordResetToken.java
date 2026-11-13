@@ -33,6 +33,18 @@ public class PasswordResetToken {
     @Builder.Default
     private boolean used = false;
 
+    @Enumerated(EnumType.STRING)
+    private TokenPurpose purpose;
+
+    public enum TokenPurpose {
+        PASSWORD_RESET,
+        EMAIL_VERIFICATION
+    }
+
+    public TokenPurpose effectivePurpose() {
+        return purpose != null ? purpose : TokenPurpose.PASSWORD_RESET;
+    }
+
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiryDate);
     }

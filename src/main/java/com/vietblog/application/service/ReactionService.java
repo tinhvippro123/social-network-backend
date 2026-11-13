@@ -9,7 +9,6 @@ import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import com.vietblog.domain.service.PostDomainService;
-import com.vietblog.infrastructure.repository.NotificationRepository;
 import com.vietblog.infrastructure.repository.PostRepository;
 import com.vietblog.infrastructure.repository.ReactionRepository;
 import com.vietblog.infrastructure.repository.UserRepository;
@@ -29,7 +28,7 @@ public class ReactionService {
     private final ReactionRepository reactionRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final PostDomainService postDomainService;
     private final CacheGateway cache;
 
@@ -83,13 +82,13 @@ public class ReactionService {
             String msg = "UPVOTE".equals(emoji)
                     ? user.getName() + " đã bình chọn bài viết của bạn: \"" + post.getTitle() + "\""
                     : user.getName() + " đã thả cảm xúc " + emoji + " vào bài viết \"" + post.getTitle() + "\"";
-            notificationRepository.save(Notification.builder()
-                    .user(post.getAuthor())
-                    .type(Notification.NotificationType.UPVOTE)
-                    .message(msg)
-                    .avatar(user.getAvatar())
-                    .link("/posts/" + post.getId())
-                    .build());
+            notificationService.notify(
+                    post.getAuthor(),
+                    Notification.NotificationType.UPVOTE,
+                    msg,
+                    user.getAvatar(),
+                    "/posts/" + post.getId()
+            );
         }
 
         postDomainService.calculateTrendingScore(post);

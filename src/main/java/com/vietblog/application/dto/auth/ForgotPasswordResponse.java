@@ -11,7 +11,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ForgotPasswordResponse {
     private String message;
-    private String resetToken;
-    private String otp;
     private long expiresInSeconds;
 }

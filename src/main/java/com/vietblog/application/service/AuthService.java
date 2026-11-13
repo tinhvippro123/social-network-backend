@@ -45,6 +45,12 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final ObjectMapper objectMapper;
     private final SystemSettingsService systemSettingsService;
+    private final EmailService emailService;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int OTP_EXPIRY_MINUTES = 15;
+
+    private record IssuedOtpToken(String token, String otp, LocalDateTime expiryDate) {}
 
     @org.springframework.beans.factory.annotation.Value("${google.client-id:}")
     private String googleClientId;
@@ -56,11 +62,15 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword())
         );
 
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+        if (isEmailVerificationRequired() && !user.isEmailVerifiedEffective()) {
+            throw new BusinessRuleException(ErrorCode.EMAIL_NOT_VERIFIED);
+        }
+
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String accessToken = tokenProvider.generateToken(authentication);
 
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
@@ -69,12 +79,9 @@ public class AuthService {
     }
 
     @Transactional
-    public void register(RegisterRequest request) {
-        if (systemSettingsService != null) {
-            Object allowReg = systemSettingsService.getAll().get("allowRegistration");
-            if (Boolean.FALSE.equals(allowReg)) {
-                throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Hệ thống tạm thời đóng đăng ký tài khoản mới");
-            }
+    public RegisterResponse register(RegisterRequest request) {
+        if (systemSettingsService != null && !systemSettingsService.isAllowRegistration()) {
+            throw new BusinessRuleException(ErrorCode.REGISTRATION_DISABLED);
         }
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         if (request.getPasswordConfirm() != null && !request.getPasswordConfirm().isBlank()
@@ -85,13 +92,76 @@ public class AuthService {
             throw new BusinessRuleException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
+        boolean requireVerification = isEmailVerificationRequired();
+        if (requireVerification && !emailService.isConfigured()) {
+            throw new BusinessRuleException(ErrorCode.EMAIL_NOT_CONFIGURED);
+        }
+
         User user = User.builder()
                 .name(request.getName().trim())
                 .email(normalizedEmail)
                 .password(passwordEncoder.encode(request.getPassword()))
+                .emailVerified(!requireVerification)
                 .build();
 
         userRepository.save(user);
+
+        if (requireVerification) {
+            IssuedOtpToken issued = issueOtpToken(user, PasswordResetToken.TokenPurpose.EMAIL_VERIFICATION);
+            emailService.sendVerificationOtp(user, issued.otp(), OTP_EXPIRY_MINUTES);
+            return RegisterResponse.builder()
+                    .requiresVerification(true)
+                    .email(normalizedEmail)
+                    .message("Đăng ký thành công. Vui lòng kiểm tra email để nhập mã OTP xác thực tài khoản.")
+                    .build();
+        }
+
+        return RegisterResponse.builder()
+                .requiresVerification(false)
+                .email(normalizedEmail)
+                .message("Đăng ký thành công. Bạn có thể đăng nhập ngay.")
+                .build();
+    }
+
+    @Transactional
+    public AuthSessionResult verifyEmail(VerifyEmailRequest request) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        PasswordResetToken verificationToken = resolveOtpOrToken(
+                request.getOtp().trim(),
+                normalizedEmail,
+                PasswordResetToken.TokenPurpose.EMAIL_VERIFICATION,
+                ErrorCode.INVALID_VERIFICATION_TOKEN,
+                ErrorCode.VERIFICATION_TOKEN_EXPIRED
+        );
+
+        User user = verificationToken.getUser();
+        if (!user.isActive()) {
+            throw new ForbiddenException(ErrorCode.FORBIDDEN);
+        }
+
+        user.setEmailVerified(true);
+        verificationToken.setUsed(true);
+        resetTokenRepository.save(verificationToken);
+
+        return issueSession(user);
+    }
+
+    @Transactional
+    public void resendVerification(ResendVerificationRequest request) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        User user = userRepository.findByEmail(normalizedEmail)
+                .or(() -> userRepository.findByEmail(request.getEmail().trim()))
+                .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
+
+        if (!user.isActive()) {
+            throw new ForbiddenException(ErrorCode.FORBIDDEN);
+        }
+        if (user.isEmailVerifiedEffective()) {
+            throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Email này đã được xác thực. Vui lòng đăng nhập.");
+        }
+
+        IssuedOtpToken issued = issueOtpToken(user, PasswordResetToken.TokenPurpose.EMAIL_VERIFICATION);
+        emailService.sendVerificationOtp(user, issued.otp(), OTP_EXPIRY_MINUTES);
     }
 
     @Transactional
@@ -115,33 +185,14 @@ public class AuthService {
                 .or(() -> userRepository.findByEmail(request.getEmail().trim()))
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
-        for (PasswordResetToken existing : resetTokenRepository.findByUserAndUsedFalse(user)) {
-            existing.setUsed(true);
-            resetTokenRepository.save(existing);
-        }
+        IssuedOtpToken issued = issueOtpToken(user, PasswordResetToken.TokenPurpose.PASSWORD_RESET);
+        emailService.sendPasswordResetOtp(user, issued.otp(), OTP_EXPIRY_MINUTES);
 
-        String resetToken = UUID.randomUUID().toString();
-        String otp = String.format("%06d", new SecureRandom().nextInt(1_000_000));
-        LocalDateTime expiryDate = LocalDateTime.now().plusMinutes(15);
-
-        PasswordResetToken token = PasswordResetToken.builder()
-                .token(resetToken)
-                .otp(otp)
-                .user(user)
-                .expiryDate(expiryDate)
-                .used(false)
-                .build();
-
-        resetTokenRepository.save(token);
-
-        log.info("[PASSWORD_RESET] Created reset token for email={}: token={}, otp={}, expiresAt={}",
-                user.getEmail(), resetToken, otp, expiryDate);
+        log.info("[PASSWORD_RESET] Sent reset OTP email for user id={}, expiresAt={}", user.getId(), issued.expiryDate());
 
         return ForgotPasswordResponse.builder()
-                .message("Mã xác nhận đặt lại mật khẩu đã được tạo thành công")
-                .resetToken(resetToken)
-                .otp(otp)
-                .expiresInSeconds(15 * 60)
+                .message("Mã OTP đặt lại mật khẩu đã được gửi về email của bạn")
+                .expiresInSeconds(OTP_EXPIRY_MINUTES * 60L)
                 .build();
     }
 
@@ -152,20 +203,13 @@ public class AuthService {
                 ? request.getEmail().trim()
                 : null;
 
-        Optional<PasswordResetToken> tokenOpt = resetTokenRepository.findByTokenAndUsedFalse(tokenOrOtp)
-                .filter(t -> emailFilter == null || (t.getUser() != null && emailFilter.equalsIgnoreCase(t.getUser().getEmail())));
-        if (tokenOpt.isEmpty()) {
-            tokenOpt = emailFilter != null
-                    ? resetTokenRepository.findFirstByOtpAndUserEmailIgnoreCaseAndUsedFalseOrderByExpiryDateDesc(tokenOrOtp, emailFilter)
-                    : resetTokenRepository.findFirstByOtpAndUsedFalseOrderByExpiryDateDesc(tokenOrOtp);
-        }
-
-        PasswordResetToken resetToken = tokenOpt
-                .orElseThrow(() -> new BusinessRuleException(ErrorCode.INVALID_RESET_TOKEN));
-
-        if (resetToken.isExpired()) {
-            throw new BusinessRuleException(ErrorCode.RESET_TOKEN_EXPIRED);
-        }
+        PasswordResetToken resetToken = resolveOtpOrToken(
+                tokenOrOtp,
+                emailFilter,
+                PasswordResetToken.TokenPurpose.PASSWORD_RESET,
+                ErrorCode.INVALID_RESET_TOKEN,
+                ErrorCode.RESET_TOKEN_EXPIRED
+        );
 
         User user = resetToken.getUser();
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -174,7 +218,74 @@ public class AuthService {
         resetToken.setUsed(true);
         resetTokenRepository.save(resetToken);
 
-        log.info("[PASSWORD_RESET] Password successfully reset for user id={}, email={}", user.getId(), user.getEmail());
+        log.info("[PASSWORD_RESET] Password successfully reset for user id={}", user.getId());
+    }
+
+    private boolean isEmailVerificationRequired() {
+        return systemSettingsService == null || systemSettingsService.isRequireEmailVerification();
+    }
+
+    private IssuedOtpToken issueOtpToken(User user, PasswordResetToken.TokenPurpose purpose) {
+        for (PasswordResetToken existing : resetTokenRepository.findByUserAndUsedFalse(user)) {
+            if (existing.effectivePurpose() == purpose) {
+                existing.setUsed(true);
+                resetTokenRepository.save(existing);
+            }
+        }
+
+        String resetToken = UUID.randomUUID().toString();
+        String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        LocalDateTime expiryDate = LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES);
+
+        PasswordResetToken token = PasswordResetToken.builder()
+                .token(resetToken)
+                .otp(otp)
+                .user(user)
+                .expiryDate(expiryDate)
+                .used(false)
+                .purpose(purpose)
+                .build();
+
+        resetTokenRepository.save(token);
+        return new IssuedOtpToken(resetToken, otp, expiryDate);
+    }
+
+    private PasswordResetToken resolveOtpOrToken(
+            String tokenOrOtp,
+            String emailFilter,
+            PasswordResetToken.TokenPurpose expectedPurpose,
+            ErrorCode invalidCode,
+            ErrorCode expiredCode) {
+        Optional<PasswordResetToken> tokenOpt = resetTokenRepository.findByTokenAndUsedFalse(tokenOrOtp)
+                .filter(t -> t.effectivePurpose() == expectedPurpose)
+                .filter(t -> emailFilter == null || (t.getUser() != null && emailFilter.equalsIgnoreCase(t.getUser().getEmail())));
+
+        if (tokenOpt.isEmpty()) {
+            if (emailFilter != null) {
+                tokenOpt = resetTokenRepository
+                        .findAllByOtpAndUserEmailIgnoreCaseAndUsedFalseOrderByExpiryDateDesc(tokenOrOtp, emailFilter)
+                        .stream()
+                        .filter(t -> t.effectivePurpose() == expectedPurpose)
+                        .findFirst();
+            } else {
+                tokenOpt = resetTokenRepository.findFirstByOtpAndUsedFalseOrderByExpiryDateDesc(tokenOrOtp)
+                        .filter(t -> t.effectivePurpose() == expectedPurpose);
+            }
+        }
+
+        PasswordResetToken matched = tokenOpt.orElseThrow(() -> new BusinessRuleException(invalidCode));
+        if (matched.isExpired()) {
+            throw new BusinessRuleException(expiredCode);
+        }
+        return matched;
+    }
+
+    private AuthSessionResult issueSession(User user) {
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+        String accessToken = tokenProvider.generateTokenFromUserId(user.getId());
+        String refreshToken = tokenProvider.generateRefreshTokenFromUserId(user.getId());
+        return new AuthSessionResult(accessToken, refreshToken, JwtAuthenticationResponse.UserDto.fromEntity(user));
     }
 
     @Transactional(readOnly = true)
@@ -283,6 +394,7 @@ public class AuthService {
                     .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                     .role(User.Role.USER)
                     .isActive(true)
+                    .emailVerified(true)
                     .joinedAt(LocalDateTime.now())
                     .lastLoginAt(LocalDateTime.now())
                     .build();
@@ -296,12 +408,8 @@ public class AuthService {
         if ((user.getAvatar() == null || user.getAvatar().isBlank()) && finalPicture != null && !finalPicture.isBlank()) {
             user.setAvatar(finalPicture);
         }
-        user.setLastLoginAt(LocalDateTime.now());
-        userRepository.save(user);
-
-        String accessToken = tokenProvider.generateTokenFromUserId(user.getId());
-        String refreshToken = tokenProvider.generateRefreshTokenFromUserId(user.getId());
-        return new AuthSessionResult(accessToken, refreshToken, JwtAuthenticationResponse.UserDto.fromEntity(user));
+        user.setEmailVerified(true);
+        return issueSession(user);
     }
 
     public String createWebSocketTicket(String userId) {

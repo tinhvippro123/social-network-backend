@@ -3,6 +3,7 @@ package com.vietblog.presentation.controller;
 import com.vietblog.application.dto.ApiResponse;
 import com.vietblog.application.dto.post.PostResponse;
 import com.vietblog.application.dto.user.UpdateProfileRequest;
+import com.vietblog.application.dto.user.UserPreferencesDto;
 import com.vietblog.application.dto.user.UserProfileResponse;
 import com.vietblog.application.dto.user.UserSummaryResponse;
 import com.vietblog.application.service.UserApplicationService;
@@ -36,6 +37,21 @@ public class UserController {
             @Valid @RequestBody UpdateProfileRequest request) {
         UserProfileResponse response = userApplicationService.updateProfile(currentUser.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật hồ sơ thành công"));
+    }
+
+    @GetMapping("/me/preferences")
+    public ResponseEntity<ApiResponse<UserPreferencesDto>> getPreferences(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        UserPreferencesDto response = userApplicationService.getPreferences(currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy cài đặt cá nhân thành công"));
+    }
+
+    @PutMapping("/me/preferences")
+    public ResponseEntity<ApiResponse<UserPreferencesDto>> updatePreferences(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody UserPreferencesDto request) {
+        UserPreferencesDto response = userApplicationService.updatePreferences(currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật cài đặt cá nhân thành công"));
     }
 
     @GetMapping("/recommended")

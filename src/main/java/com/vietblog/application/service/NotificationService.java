@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class NotificationService {
     private final NotificationRepository notifications;
+    private final EmailService emailService;
 
     @Transactional(readOnly = true)
     public Page<NotificationResponse> list(String userId, boolean unreadOnly, int page, int limit) {
@@ -49,6 +50,59 @@ public class NotificationService {
     /** Internal event delivery; callers must derive the recipient from a persisted domain relationship. */
     @Transactional
     public void notify(User recipient, Notification.NotificationType type, String message, String avatar, String link) {
-        notifications.save(Notification.builder().user(recipient).type(type).message(message).avatar(avatar).link(link).build());
+        notifyWithPreferences(recipient, type, message, avatar, link, null, null);
+    }
+
+    /**
+     * Tạo thông báo trong ứng dụng và (tùy chọn) gửi email nền dựa trên cài đặt cá nhân của người nhận.
+     */
+    @Transactional
+    public void notifyWithPreferences(
+            User recipient,
+            Notification.NotificationType type,
+            String message,
+            String avatar,
+            String link,
+            String emailSubject,
+            String emailHeading) {
+        if (recipient == null) {
+            return;
+        }
+        if (isInAppEnabled(recipient, type, link)) {
+            notifications.save(Notification.builder()
+                    .user(recipient)
+                    .type(type)
+                    .message(message)
+                    .avatar(avatar)
+                    .link(link)
+                    .build());
+        }
+        if (emailSubject != null && isEmailEnabled(recipient, type)) {
+            emailService.sendNotificationEmailAsync(
+                    recipient.getEmail(),
+                    recipient.getName(),
+                    emailSubject,
+                    emailHeading != null ? emailHeading : emailSubject,
+                    message,
+                    link
+            );
+        }
+    }
+
+    private static boolean isInAppEnabled(User recipient, Notification.NotificationType type, String link) {
+        return switch (type) {
+            case FOLLOW -> recipient.isNotifyNewFollowerEffective();
+            case COMMENT -> recipient.isNotifyNewCommentEffective();
+            case SYSTEM -> (link != null && link.startsWith("/posts/")) ? recipient.isNotifyTrendingEffective() : true;
+            default -> true;
+        };
+    }
+
+    private static boolean isEmailEnabled(User recipient, Notification.NotificationType type) {
+        return switch (type) {
+            case FOLLOW -> recipient.isEmailNewFollowerEffective();
+            case COMMENT -> recipient.isEmailNewCommentEffective();
+            default -> false;
+        };
     }
 }

@@ -28,14 +28,30 @@ public class UserProfileResponse {
     private boolean isFollowing;
     @JsonProperty("isMe")
     private boolean isMe;
+    private String profileVisibility;
+    private String allowMessages;
+    private boolean canViewProfile;
+    private boolean canMessage;
+    private boolean emailVerified;
+    private UserPreferencesDto preferences;
 
     public static UserProfileResponse fromEntity(User user, boolean isFollowing, boolean isMe, int accuratePostsCount) {
+        return fromEntity(user, isFollowing, isMe, accuratePostsCount, true, !isMe);
+    }
+
+    public static UserProfileResponse fromEntity(
+            User user,
+            boolean isFollowing,
+            boolean isMe,
+            int accuratePostsCount,
+            boolean canViewProfile,
+            boolean canMessage) {
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
                 .email(isMe ? user.getEmail() : null)
                 .avatar(user.getAvatar())
-                .bio(user.getBio())
+                .bio(canViewProfile ? user.getBio() : null)
                 .role(user.getRole() != null ? user.getRole().name().toLowerCase() : "user")
                 .joinedAt(user.getJoinedAt())
                 .postsCount(accuratePostsCount)
@@ -43,6 +59,12 @@ public class UserProfileResponse {
                 .followingCount(user.getFollowingCount())
                 .isFollowing(isFollowing)
                 .isMe(isMe)
+                .profileVisibility(user.effectiveProfileVisibility())
+                .allowMessages(user.effectiveAllowMessages())
+                .canViewProfile(canViewProfile)
+                .canMessage(canMessage)
+                .emailVerified(user.isEmailVerifiedEffective())
+                .preferences(isMe ? UserPreferencesDto.fromEntity(user) : null)
                 .build();
     }
 }

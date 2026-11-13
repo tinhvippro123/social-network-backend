@@ -47,9 +47,24 @@ public class SystemSettingsService {
 
     @Transactional(readOnly = true)
     public boolean isMaintenanceMode() {
-        return repository.findById("maintenanceMode")
+        return getBoolean("maintenanceMode");
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isRequireEmailVerification() {
+        return getBoolean("requireEmailVerification");
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isAllowRegistration() {
+        return getBoolean("allowRegistration");
+    }
+
+    @Transactional(readOnly = true)
+    public boolean getBoolean(String key) {
+        return repository.findById(key)
                 .map(s -> Boolean.parseBoolean(s.getValue()))
-                .orElse(Boolean.TRUE.equals(DEFAULTS.get("maintenanceMode")));
+                .orElse(Boolean.TRUE.equals(DEFAULTS.get(key)));
     }
 
     @Transactional

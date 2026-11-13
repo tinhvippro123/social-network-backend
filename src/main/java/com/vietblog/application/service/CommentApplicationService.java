@@ -6,6 +6,7 @@ import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.application.dto.comment.CommentResponse;
 import com.vietblog.application.dto.comment.CreateCommentRequest;
 import com.vietblog.domain.entity.Comment;
+import com.vietblog.domain.entity.Notification;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.BusinessRuleException;
@@ -30,7 +31,7 @@ public class CommentApplicationService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final CommentDomainService commentDomainService;
-    private final com.vietblog.infrastructure.repository.NotificationRepository notifications;
+    private final NotificationService notificationService;
     private final PostDomainService postDomainService;
     private final CacheGateway cache;
 
@@ -70,23 +71,27 @@ public class CommentApplicationService {
         postDomainService.calculateTrendingScore(post);
         cache.evict(PostApplicationService.TRENDING_IDS_CACHE_KEY);
         if (parentComment != null && !parentComment.getAuthor().getId().equals(authorId)) {
-            notifications.save(Notification.builder()
-                    .user(parentComment.getAuthor())
-                    .type(Notification.NotificationType.COMMENT)
-                    .message(author.getName() + " đã trả lời bình luận của bạn")
-                    .avatar(author.getAvatar())
-                    .link("/posts/" + postId + "#comment-" + comment.getId())
-                    .build());
+            notificationService.notifyWithPreferences(
+                    parentComment.getAuthor(),
+                    Notification.NotificationType.COMMENT,
+                    author.getName() + " đã trả lời bình luận của bạn",
+                    author.getAvatar(),
+                    "/posts/" + postId + "#comment-" + comment.getId(),
+                    "[VietBlog] " + author.getName() + " đã trả lời bình luận của bạn",
+                    "Phản hồi bình luận mới"
+            );
         }
         if (!post.getAuthor().getId().equals(authorId)
                 && (parentComment == null || !parentComment.getAuthor().getId().equals(post.getAuthor().getId()))) {
-            notifications.save(Notification.builder()
-                    .user(post.getAuthor())
-                    .type(Notification.NotificationType.COMMENT)
-                    .message(author.getName() + " đã bình luận về bài viết của bạn")
-                    .avatar(author.getAvatar())
-                    .link("/posts/" + postId + "#comment-" + comment.getId())
-                    .build());
+            notificationService.notifyWithPreferences(
+                    post.getAuthor(),
+                    Notification.NotificationType.COMMENT,
+                    author.getName() + " đã bình luận về bài viết của bạn",
+                    author.getAvatar(),
+                    "/posts/" + postId + "#comment-" + comment.getId(),
+                    "[VietBlog] " + author.getName() + " đã bình luận bài viết \"" + post.getTitle() + "\"",
+                    "Bình luận mới trên bài viết của bạn"
+            );
         }
 
         // Lấy lại từ DB để lấy được toàn bộ context nếu cần (đặc biệt khi lưu xong)

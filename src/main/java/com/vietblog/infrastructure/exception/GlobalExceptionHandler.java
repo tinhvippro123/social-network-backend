@@ -83,9 +83,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ApiResponse<Object>> handleBusinessRuleException(BusinessRuleException ex) {
-        HttpStatus status = ex.getErrorCode() == ErrorCode.UNAUTHORIZED
-                ? HttpStatus.UNAUTHORIZED
-                : HttpStatus.BAD_REQUEST;
+        HttpStatus status = switch (ex.getErrorCode()) {
+            case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN, EMAIL_NOT_VERIFIED, PROFILE_PRIVATE, MESSAGE_PRIVACY_RESTRICTED -> HttpStatus.FORBIDDEN;
+            case EMAIL_NOT_CONFIGURED -> HttpStatus.SERVICE_UNAVAILABLE;
+            case EMAIL_SEND_FAILED -> HttpStatus.BAD_GATEWAY;
+            default -> HttpStatus.BAD_REQUEST;
+        };
         return ResponseEntity.status(status)
                 .body(ApiResponse.error(ex.getErrorCode().name(), ex.getMessage()));
     }

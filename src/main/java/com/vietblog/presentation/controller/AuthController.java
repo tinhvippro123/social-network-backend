@@ -63,15 +63,31 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request);
-        return ResponseEntity.ok(ApiResponse.success(null, "Đăng ký thành công"));
+    public ResponseEntity<ApiResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest request) {
+        RegisterResponse response = authService.register(request);
+        return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<ApiResponse<JwtAuthenticationResponse>> verifyEmail(
+            @Valid @RequestBody VerifyEmailRequest request,
+            HttpServletResponse servletResponse) {
+        AuthSessionResult session = authService.verifyEmail(request);
+        authCookieService.writeAuthCookies(servletResponse, session.accessToken(), session.refreshToken());
+        return ResponseEntity.ok(ApiResponse.success(new JwtAuthenticationResponse(session.user()), "Xác thực email thành công"));
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<ApiResponse<Void>> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerification(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Mã xác thực mới đã được gửi về email của bạn"));
     }
 
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<ForgotPasswordResponse>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         ForgotPasswordResponse response = authService.forgotPassword(request);
-        return ResponseEntity.ok(ApiResponse.success(response, "Mã xác nhận đặt lại mật khẩu đã được tạo thành công"));
+        return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
 
     @PostMapping("/reset-password")

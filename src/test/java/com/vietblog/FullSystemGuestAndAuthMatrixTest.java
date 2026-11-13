@@ -2,10 +2,12 @@ package com.vietblog;
 
 import com.vietblog.domain.entity.*;
 import com.vietblog.infrastructure.repository.*;
+import com.vietblog.support.CapturingJavaMailSender;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,9 +37,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @Transactional
+@Import(CapturingJavaMailSender.Config.class)
 class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
 
     @Autowired WebApplicationContext context;
+    @Autowired CapturingJavaMailSender capturingMailSender;
     @Autowired UserRepository users;
     @Autowired PostRepository posts;
     @Autowired CategoryRepository categories;
@@ -362,25 +366,58 @@ class FullSystemGuestAndAuthMatrixTest extends VietblogBackendApplicationTests {
 
     @Test
     void authenticatedUserLifecycleWorksViaHttpOnlyCookieAndEnforcesStrict403RoleBoundaries() throws Exception {
-        // 1. Register + Forgot/Reset Password + Login via HttpOnly Cookie
+        capturingMailSender.clear();
+
+        // 1. Register -> Email OTP Verification -> Resend -> Verify -> Forgot/Reset Password via Email OTP (never leaked in JSON) -> Login
         String newEmail = "newuser-" + UUID.randomUUID().toString().substring(0, 8) + "@vietblog.test";
         mvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Thành Viên Mới\",\"email\":\"" + newEmail
                                 + "\",\"password\":\"Password123!\",\"passwordConfirm\":\"Password123!\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.requiresVerification").value(true))
+                .andExpect(jsonPath("$.data.email").value(newEmail));
 
-        MvcResult forgotRes = mvc.perform(post("/api/auth/forgot-password")
+        String initialVerifyOtp = capturingMailSender.latestOtpFor(newEmail).orElseThrow();
+        assertThat(initialVerifyOtp).hasSize(6);
+
+        // Login before email verification must be rejected with 403 EMAIL_NOT_VERIFIED
+        mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + newEmail + "\",\"password\":\"Password123!\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("EMAIL_NOT_VERIFIED"));
+
+        // Resend verification issues a fresh OTP via SMTP
+        mvc.perform(post("/api/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + newEmail + "\"}"))
+                .andExpect(status().isOk());
+        String latestVerifyOtp = capturingMailSender.latestOtpFor(newEmail).orElseThrow();
+        assertThat(latestVerifyOtp).hasSize(6);
+
+        // Verify email succeeds, sets HttpOnly cookie, and marks emailVerified = true
+        mvc.perform(post("/api/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + newEmail + "\",\"otp\":\"" + latestVerifyOtp + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.emailVerified").value(true));
+
+        // Forgot password sends OTP ONLY by email and must NOT leak otp/resetToken in JSON
+        capturingMailSender.clear();
+        mvc.perform(post("/api/auth/forgot-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + newEmail + "\"}"))
                 .andExpect(status().isOk())
-                .andReturn();
-        String otp = objectMapper.readTree(forgotRes.getResponse().getContentAsString()).path("data").path("otp").asString();
-        assertThat(otp).hasSize(6);
+                .andExpect(jsonPath("$.data.otp").doesNotExist())
+                .andExpect(jsonPath("$.data.resetToken").doesNotExist());
+
+        String resetOtp = capturingMailSender.latestOtpFor(newEmail).orElseThrow();
+        assertThat(resetOtp).hasSize(6);
 
         mvc.perform(post("/api/auth/reset-password")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"token\":\"" + otp + "\",\"newPassword\":\"NewPass123!\"}"))
+                        .content("{\"email\":\"" + newEmail + "\",\"token\":\"" + resetOtp + "\",\"newPassword\":\"NewPass123!\"}"))
                 .andExpect(status().isOk());
 
         MvcResult loginNew = mvc.perform(post("/api/auth/login")

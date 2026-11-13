@@ -31,6 +31,9 @@ public class ChatService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private SystemSettingsService systemSettingsService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private EmailService emailService;
+
     private java.util.function.Predicate<String> onlineChecker = id -> false;
 
     public void setOnlineChecker(java.util.function.Predicate<String> onlineChecker) {
@@ -74,6 +77,8 @@ public class ChatService {
                 membership.setHidden(false);
                 return conversation(existing.get(), membership);
             }
+            User otherUser = participants.get(0).getId().equals(userId) ? participants.get(1) : participants.get(0);
+            requireCanMessage(userId, otherUser);
         }
         Conversation conversation = conversations.save(Conversation.builder().creator(creator).name(resolvedName)
                 .groupChat(request.isGroup()).directKey(directKey).build());
@@ -102,7 +107,10 @@ public class ChatService {
         List<ConversationMember> participants = members.findByConversationId(id);
         if (!conversation.isGroupChat()) {
             participants.stream().filter(m -> !m.getUser().getId().equals(userId))
-                    .forEach(m -> requireUnblocked(userId, m.getUser().getId()));
+                    .forEach(m -> {
+                        requireUnblocked(userId, m.getUser().getId());
+                        requireCanMessage(userId, m.getUser());
+                    });
         }
         String type = request.type() == null ? "text" : request.type();
         if (!Set.of("text", "image", "file").contains(type) || request.content() == null || request.content().length() > 10000) invalid();
@@ -117,6 +125,26 @@ public class ChatService {
         participants.forEach(m -> m.setHidden(false));
         for (ConversationMember recipient : participants) {
             events.publishEvent(new ChatEvent("message.created", id, recipient.getUser().getId(), message(message, recipient.getUser().getId(), participants)));
+            if (!recipient.getUser().getId().equals(userId)
+                    && !recipient.isMuted()
+                    && recipient.getUser().isEmailNewMessageEffective()
+                    && emailService != null) {
+                String preview = switch (type) {
+                    case "image" -> "[Đã gửi một hình ảnh]";
+                    case "file" -> "[Đã gửi tệp đính kèm]";
+                    default -> message.getContent().length() > 140
+                            ? message.getContent().substring(0, 140) + "..."
+                            : message.getContent();
+                };
+                emailService.sendNotificationEmailAsync(
+                        recipient.getUser().getEmail(),
+                        recipient.getUser().getName(),
+                        "[VietBlog] Tin nhắn mới từ " + sender.getUser().getName(),
+                        "Tin nhắn mới trên VietBlog",
+                        sender.getUser().getName() + ": " + preview,
+                        "/chat"
+                );
+            }
         }
         return message(message, userId, participants);
     }
@@ -130,9 +158,12 @@ public class ChatService {
                 .orElse(LocalDateTime.now().truncatedTo(ChronoUnit.MICROS));
         reader.setLastReadAt(boundary);
         members.saveAndFlush(reader);
+        boolean showReadReceipts = reader.getUser().isShowReadReceiptsEffective();
         for (ConversationMember recipient : members.findByConversationId(id)) {
-            events.publishEvent(new ChatEvent("conversation.read", id, recipient.getUser().getId(),
-                    Map.of("userId", userId, "readAt", boundary.toString())));
+            if (showReadReceipts || recipient.getUser().getId().equals(userId)) {
+                events.publishEvent(new ChatEvent("conversation.read", id, recipient.getUser().getId(),
+                        Map.of("userId", userId, "readAt", boundary.toString())));
+            }
         }
     }
 
@@ -232,8 +263,10 @@ public class ChatService {
             }
         }
         boolean isOnline = conversation.isGroupChat()
-                ? participants.stream().anyMatch(u -> !u.id().equals(viewer.getUser().getId()) && onlineChecker.test(u.id()))
-                : onlineChecker.test(other.id());
+                ? allMembers.stream().anyMatch(m -> !m.getUser().getId().equals(viewer.getUser().getId())
+                        && m.getUser().isShowOnlineStatusEffective()
+                        && onlineChecker.test(m.getUser().getId()))
+                : (otherMember.getUser().isShowOnlineStatusEffective() && onlineChecker.test(other.id()));
         return new ConversationResponse(conversation.getId(), displayName,
                 conversation.isGroupChat() ? null : other.avatar(), previewText,
                 latest == null ? conversation.getCreatedAt() : latest.getCreatedAt(),
@@ -242,7 +275,9 @@ public class ChatService {
     }
 
     private MessageResponse message(ChatMessage message, String userId, List<ConversationMember> participants) {
-        List<ReadReceipt> receipts = participants.stream().filter(m -> !m.getUser().getId().equals(message.getSender().getId()))
+        List<ReadReceipt> receipts = participants.stream()
+                .filter(m -> !m.getUser().getId().equals(message.getSender().getId()))
+                .filter(m -> m.getUser().isShowReadReceiptsEffective())
                 .filter(m -> m.getLastReadAt() != null && !m.getLastReadAt().isBefore(message.getCreatedAt()))
                 .map(m -> new ReadReceipt(PublicUser.from(m.getUser()), m.getLastReadAt())).toList();
         ChatMessage reply = message.getReplyTo();
@@ -268,6 +303,12 @@ public class ChatService {
     }
     private void requireUnblocked(String first, String second) {
         if (blocks.existsByBlockerIdAndBlockedId(first, second) || blocks.existsByBlockerIdAndBlockedId(second, first)) forbidden();
+    }
+    private void requireCanMessage(String senderId, User recipient) {
+        boolean isFollower = users.isFollowing(recipient.getId(), senderId);
+        if (!recipient.canReceiveMessageFrom(senderId, isFollower)) {
+            throw new BusinessRuleException(ErrorCode.MESSAGE_PRIVACY_RESTRICTED);
+        }
     }
     private static void requireUrl(String value) {
         try {
