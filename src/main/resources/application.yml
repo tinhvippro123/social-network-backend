@@ -38,8 +38,8 @@ spring:
   # ── File Upload ───────────────────────────
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: 5MB
+      max-request-size: 5MB
 
 # ── Server ────────────────────────────────
 server:
@@ -70,9 +70,9 @@ cors:
 
 # ── Cloudinary ────────────────────────────
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME:dan2b8knu}
-  api-key: ${CLOUDINARY_API_KEY:432231466341726}
-  api-secret: ${CLOUDINARY_API_SECRET:xBGOokPoQSU9TBt1ry7OMqWaz_s}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+  api-key: ${CLOUDINARY_API_KEY:}
+  api-secret: ${CLOUDINARY_API_SECRET:}
 
 # ── Google OAuth ─────────────────────────
 google:

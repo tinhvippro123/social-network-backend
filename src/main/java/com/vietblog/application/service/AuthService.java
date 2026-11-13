@@ -46,6 +46,9 @@ public class AuthService {
     private final ObjectMapper objectMapper;
     private final SystemSettingsService systemSettingsService;
 
+    @org.springframework.beans.factory.annotation.Value("${google.client-id:}")
+    private String googleClientId;
+
     @Transactional
     public AuthSessionResult login(LoginRequest request) {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
@@ -208,6 +211,10 @@ public class AuthService {
                 HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
                 if (httpResponse.statusCode() == 200) {
                     Map<?, ?> body = objectMapper.readValue(httpResponse.body(), Map.class);
+                    if (googleClientId != null && !googleClientId.isBlank()
+                            && !googleClientId.equals(String.valueOf(body.get("aud")))) {
+                        throw new BusinessRuleException(ErrorCode.UNAUTHORIZED);
+                    }
                     email = (String) body.get("email");
                     name = (String) body.get("name");
                     picture = (String) body.get("picture");
@@ -224,6 +231,10 @@ public class AuthService {
                 HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
                 if (httpResponse.statusCode() == 200) {
                     Map<?, ?> body = objectMapper.readValue(httpResponse.body(), Map.class);
+                    if (googleClientId != null && !googleClientId.isBlank()
+                            && !googleClientId.equals(String.valueOf(body.get("aud")))) {
+                        throw new BusinessRuleException(ErrorCode.UNAUTHORIZED);
+                    }
                     email = (String) body.get("email");
                     name = (String) body.get("name");
                     picture = (String) body.get("picture");
@@ -245,6 +256,12 @@ public class AuthService {
         final String finalPicture = picture;
 
         User user = userRepository.findByEmail(finalEmail).orElseGet(() -> {
+            if (systemSettingsService != null) {
+                Object allowReg = systemSettingsService.getAll().get("allowRegistration");
+                if (Boolean.FALSE.equals(allowReg)) {
+                    throw new BusinessRuleException(ErrorCode.INVALID_INPUT, "Hệ thống tạm thời đóng đăng ký tài khoản mới");
+                }
+            }
             User newUser = User.builder()
                     .email(finalEmail)
                     .name(finalName)

@@ -18,6 +18,7 @@ public interface ReportRepository extends JpaRepository<Report, String> {
     boolean existsByReporterIdAndTargetIdAndTypeAndStatus(String reporterId, String targetId,
                                                         Report.TargetType type, Report.ReportStatus status);
     List<Report> findByTypeAndTargetIdAndStatus(Report.TargetType type, String targetId, Report.ReportStatus status);
+    long countByTypeAndTargetIdAndStatus(Report.TargetType type, String targetId, Report.ReportStatus status);
 
     @Query("SELECT r.targetId, COUNT(r) FROM Report r WHERE r.type = :type AND r.targetId IN :targetIds GROUP BY r.targetId")
     List<Object[]> countByTargetIds(@Param("type") Report.TargetType type, @Param("targetIds") java.util.Collection<String> targetIds);

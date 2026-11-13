@@ -112,15 +112,26 @@ public class SearchApplicationService {
     private List<PostResponse> textSearch(String query, String type, int limit, String viewerId) {
         // Unaccented queries ("da lat", "tri tue nhan tao") are matched against diacritic-folded text
         // so users can search Vietnamese content without typing accents.
-        boolean folded = TextAlgorithms.isUnaccented(query);
-        List<Post> corpus = "semantic".equals(type) ? semanticCorpus(query, limit, folded) : corpus();
+        boolean allUnaccented = TextAlgorithms.isUnaccented(query);
+        boolean hasUnaccentedToken = TextAlgorithms.tokens(query).stream().anyMatch(TextAlgorithms::isUnaccented);
+        boolean widenForUnaccented = allUnaccented || hasUnaccentedToken;
+        List<Post> corpus = "semantic".equals(type) ? semanticCorpus(query, limit, widenForUnaccented) : corpus();
         if (corpus.isEmpty()) return List.of();
         double[] scores;
         List<String> texts = corpus.stream().map(SearchApplicationService::searchableText).toList();
         if ("semantic".equals(type)) {
-            scores = folded
-                    ? TextAlgorithms.similarities(texts.stream().map(TextAlgorithms::foldedContent).toList(), TextAlgorithms.foldedContent(query))
-                    : TextAlgorithms.similarities(texts, query);
+            if (allUnaccented) {
+                scores = TextAlgorithms.similarities(texts.stream().map(TextAlgorithms::foldedContent).toList(), TextAlgorithms.foldedContent(query));
+            } else if (hasUnaccentedToken) {
+                double[] exactScores = TextAlgorithms.similarities(texts, query);
+                double[] foldedScores = TextAlgorithms.similarities(texts.stream().map(TextAlgorithms::foldedContent).toList(), TextAlgorithms.foldedContent(query));
+                scores = new double[corpus.size()];
+                for (int i = 0; i < corpus.size(); i++) {
+                    scores[i] = Math.max(exactScores[i], foldedScores[i] * 0.95);
+                }
+            } else {
+                scores = TextAlgorithms.similarities(texts, query);
+            }
         } else {
             Set<String> terms = new HashSet<>(TextAlgorithms.tokens(query));
             scores = texts.stream().map(text -> keywordScore(terms, TextAlgorithms.tokens(text))).mapToDouble(Double::doubleValue).toArray();

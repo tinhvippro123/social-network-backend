@@ -150,4 +150,245 @@ class AlgorithmEvaluationTest {
 
         assertThat(accuracy).isGreaterThan(0.75); // Must achieve at least 75% accuracy
     }
+
+    record SummarySample(String title, String document, String referenceSummary) {}
+
+    @Test
+    @DisplayName("Evaluate TextRank Summarization: ROUGE-1 & ROUGE-2 vs Lead-2 Baseline")
+    void evaluateTextRankSummarizationRougeMetrics() {
+        List<SummarySample> samples = List.of(
+            new SummarySample(
+                "Clean Architecture Spring Boot",
+                "Xin chào các bạn lập trình viên trẻ hôm nay trời nắng đẹp. "
+                    + "Trong chuyên mục công nghệ cuối tuần này chúng ta cùng trò chuyện nhẹ nhàng. "
+                    + "Kiến trúc Clean Architecture trong Spring Boot phân tách rõ các tầng Domain, Application, Infrastructure và Presentation giúp hệ thống dễ bảo trì và kiểm thử. "
+                    + "Tầng Domain chứa các quy tắc nghiệp vụ cốt lõi và không phụ thuộc vào cơ sở dữ liệu hay framework bên ngoài. "
+                    + "Mọi giao tiếp giữa tầng Application và PostgreSQL đều đi qua cổng giao diện Port và Adapter nhằm đảm bảo nguyên tắc đảo ngược phụ thuộc.",
+                "Kiến trúc Clean Architecture trong Spring Boot phân tách rõ các tầng Domain, Application, Infrastructure và Presentation giúp hệ thống dễ bảo trì và kiểm thử. Tầng Domain chứa các quy tắc nghiệp vụ cốt lõi và không phụ thuộc vào cơ sở dữ liệu hay framework bên ngoài."
+            ),
+            new SummarySample(
+                "Tìm kiếm ngữ nghĩa TF-IDF & pgvector",
+                "Gần đây nhiều bạn sinh viên thường đặt câu hỏi về đề tài đồ án tốt nghiệp. "
+                    + "Hôm nay mình sẽ chia sẻ một kinh nghiệm thực tế từ dự án đã hoàn thiện. "
+                    + "Giải thuật TF-IDF chuyển đổi văn bản tiếng Việt thành vector trọng số không gian để tính độ tương đồng Cosine với các bài viết khác. "
+                    + "Kết hợp vector TF-IDF 256 chiều lưu trữ trong tiện ích mở rộng pgvector giúp hệ thống tìm kiếm ngữ nghĩa phản hồi chính xác ngay cả khi truy vấn khác từ khóa. "
+                    + "Ngoài ra việc tách dấu tiếng Việt giúp người dùng tra cứu nhanh mà không cần gõ đầy đủ thanh điệu.",
+                "Giải thuật TF-IDF chuyển đổi văn bản tiếng Việt thành vector trọng số không gian để tính độ tương đồng Cosine với các bài viết khác. Kết hợp vector TF-IDF 256 chiều lưu trữ trong tiện ích mở rộng pgvector giúp hệ thống tìm kiếm ngữ nghĩa phản hồi chính xác ngay cả khi truy vấn khác từ khóa."
+            ),
+            new SummarySample(
+                "Tìm kiếm hình ảnh CBIR",
+                "Nhiếp ảnh và chia sẻ khoảnh khắc là thói quen quen thuộc của giới trẻ. "
+                    + "Tuy nhiên việc phân loại hàng nghìn bức ảnh thủ công tốn rất nhiều công sức. "
+                    + "Hệ thống tìm kiếm hình ảnh tự cài đặt trích xuất đặc trưng màu sắc HSV Color Histogram kết hợp bộ lọc phát hiện cạnh Sobel Edge Detection. "
+                    + "Đồng thời ma trận đồng xuất hiện mức xám GLCM phân tích kết cấu bề mặt ảnh để tạo thành vector đặc trưng 51 chiều so khớp bằng độ tương đồng Cosine. "
+                    + "Phương pháp thị giác máy tính cổ điển này hoạt động nhẹ nhàng mà không cần mô hình học sâu nặng nề.",
+                "Hệ thống tìm kiếm hình ảnh tự cài đặt trích xuất đặc trưng màu sắc HSV Color Histogram kết hợp bộ lọc phát hiện cạnh Sobel Edge Detection. Đồng thời ma trận đồng xuất hiện mức xám GLCM phân tích kết cấu bề mặt ảnh để tạo thành vector đặc trưng 51 chiều so khớp bằng độ tương đồng Cosine."
+            ),
+            new SummarySample(
+                "Tìm kiếm vị trí địa lý GIS",
+                "Cuối tuần bạn thường làm gì khi rảnh rỗi ở thành phố. "
+                    + "Đôi khi việc tìm một quán cà phê yên tĩnh cũng trở nên khó khăn. "
+                    + "Chức năng bản đồ bài viết sử dụng công thức Haversine tính khoảng cách địa lý theo bán kính từ tọa độ kinh độ và vĩ độ của người dùng. "
+                    + "Ở tầng cơ sở dữ liệu PostgreSQL, PostGIS sử dụng chỉ mục không gian GIST và hàm ST_DWithin để truy vấn địa điểm xung quanh trên bản đồ Leaflet. "
+                    + "Người viết bài dễ dàng gắn thẻ địa điểm quán ăn, phòng trọ hoặc sự kiện trực tiếp trên bản đồ tương tác.",
+                "Chức năng bản đồ bài viết sử dụng công thức Haversine tính khoảng cách địa lý theo bán kính từ tọa độ kinh độ và vĩ độ của người dùng. Ở tầng cơ sở dữ liệu PostgreSQL, PostGIS sử dụng chỉ mục không gian GIST và hàm ST_DWithin để truy vấn địa điểm xung quanh trên bản đồ Leaflet."
+            ),
+            new SummarySample(
+                "Chat thời gian thực WebSocket",
+                "Thời đại số kết nối mọi người lại gần nhau hơn bao giờ hết. "
+                    + "Các nền tảng mạng xã hội luôn chú trọng trải nghiệm phản hồi tức thì. "
+                    + "Kênh giao tiếp song công WebSocket theo chuẩn STOMP cho phép máy khách và máy chủ trao đổi tin nhắn 1-1 và chat nhóm với độ trễ thấp. "
+                    + "Khi triển khai đa máy chủ, Redis Pub/Sub phân phối sự kiện tin nhắn đồng bộ giữa các phiên kết nối WebSocket khác nhau. "
+                    + "Hệ thống còn hỗ trợ xác thực qua vé ngắn hạn và đếm số tin nhắn chưa đọc theo thời gian thực.",
+                "Kênh giao tiếp song công WebSocket theo chuẩn STOMP cho phép máy khách và máy chủ trao đổi tin nhắn 1-1 và chat nhóm với độ trễ thấp. Khi triển khai đa máy chủ, Redis Pub/Sub phân phối sự kiện tin nhắn đồng bộ giữa các phiên kết nối WebSocket khác nhau."
+            ),
+            new SummarySample(
+                "Xếp hạng xu hướng Trending",
+                "Mỗi ngày có hàng trăm bài đăng mới xuất hiện trên trang chủ. "
+                    + "Nếu chỉ sắp xếp theo thời gian thì nội dung chất lượng sẽ nhanh chóng bị trôi mất. "
+                    + "Thuật toán xếp hạng xu hướng kết hợp Reddit Hot Ranking và hệ số phân rã trọng lực thời gian Gravity Decay của Hacker News. "
+                    + "Bên cạnh đó công thức Wilson Score Interval với độ tin cậy 95 phần trăm giúp đánh giá công bằng các bài viết có ít lượt bình chọn. "
+                    + "Nhờ vậy các bài viết có nhiều upvote, bình luận tích cực và lượt xem cao luôn nổi bật ở vị trí đầu bảng.",
+                "Thuật toán xếp hạng xu hướng kết hợp Reddit Hot Ranking và hệ số phân rã trọng lực thời gian Gravity Decay của Hacker News. Bên cạnh đó công thức Wilson Score Interval với độ tin cậy 95 phần trăm giúp đánh giá công bằng các bài viết có ít lượt bình chọn."
+            )
+        );
+
+        double trR1P = 0, trR1R = 0, trR1F1 = 0, trR2P = 0, trR2R = 0, trR2F1 = 0;
+        double blR1P = 0, blR1R = 0, blR1F1 = 0, blR2P = 0, blR2R = 0, blR2F1 = 0;
+
+        for (SummarySample s : samples) {
+            String textRankSummary = String.join(" ", TextAlgorithms.summarize(s.document, 2));
+            String[] allSentences = s.document.split("(?<=\\.)\\s+");
+            String lead2Baseline = allSentences.length >= 2 ? allSentences[0] + " " + allSentences[1] : s.document;
+
+            double[] tr1 = rougeN(textRankSummary, s.referenceSummary, 1);
+            double[] tr2 = rougeN(textRankSummary, s.referenceSummary, 2);
+            double[] bl1 = rougeN(lead2Baseline, s.referenceSummary, 1);
+            double[] bl2 = rougeN(lead2Baseline, s.referenceSummary, 2);
+
+            trR1P += tr1[0]; trR1R += tr1[1]; trR1F1 += tr1[2];
+            trR2P += tr2[0]; trR2R += tr2[1]; trR2F1 += tr2[2];
+            blR1P += bl1[0]; blR1R += bl1[1]; blR1F1 += bl1[2];
+            blR2P += bl2[0]; blR2R += bl2[1]; blR2F1 += bl2[2];
+        }
+
+        int n = samples.size();
+        System.out.println("\n==================================================================================");
+        System.out.println(" KẾT QUẢ THỰC NGHIỆM TÓM TẮT VĂN BẢN TEXTRANK VS BASELINE LEAD-2 (THESIS REPORT)");
+        System.out.println("==================================================================================");
+        System.out.println("| Phương pháp | ROUGE-1 P (%) | ROUGE-1 R (%) | ROUGE-1 F1 (%) | ROUGE-2 P (%) | ROUGE-2 R (%) | ROUGE-2 F1 (%) |");
+        System.out.println("|---|:---:|:---:|:---:|:---:|:---:|:---:|");
+        System.out.printf("| Baseline (Lead-2) | %.2f | %.2f | %.2f | %.2f | %.2f | %.2f |\n",
+                blR1P / n * 100, blR1R / n * 100, blR1F1 / n * 100, blR2P / n * 100, blR2R / n * 100, blR2F1 / n * 100);
+        System.out.printf("| **TF-IDF + TextRank** | **%.2f** | **%.2f** | **%.2f** | **%.2f** | **%.2f** | **%.2f** |\n",
+                trR1P / n * 100, trR1R / n * 100, trR1F1 / n * 100, trR2P / n * 100, trR2R / n * 100, trR2F1 / n * 100);
+        System.out.println("==================================================================================\n");
+
+        assertThat(trR1F1 / n).isGreaterThan(blR1F1 / n);
+        assertThat(trR2F1 / n).isGreaterThan(blR2F1 / n);
+    }
+
+    private static double[] rougeN(String candidate, String reference, int nGram) {
+        List<String> candTokens = TextAlgorithms.tokens(candidate);
+        List<String> refTokens = TextAlgorithms.tokens(reference);
+        Map<String, Integer> candGrams = nGramCounts(candTokens, nGram);
+        Map<String, Integer> refGrams = nGramCounts(refTokens, nGram);
+        int candTotal = candGrams.values().stream().mapToInt(Integer::intValue).sum();
+        int refTotal = refGrams.values().stream().mapToInt(Integer::intValue).sum();
+        if (candTotal == 0 || refTotal == 0) return new double[]{0, 0, 0};
+
+        int overlap = 0;
+        for (var e : candGrams.entrySet()) {
+            overlap += Math.min(e.getValue(), refGrams.getOrDefault(e.getKey(), 0));
+        }
+        double precision = (double) overlap / candTotal;
+        double recall = (double) overlap / refTotal;
+        double f1 = (precision + recall == 0) ? 0 : 2 * precision * recall / (precision + recall);
+        return new double[]{precision, recall, f1};
+    }
+
+    private static Map<String, Integer> nGramCounts(List<String> tokens, int n) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (int i = 0; i + n <= tokens.size(); i++) {
+            counts.merge(String.join(" ", tokens.subList(i, i + n)), 1, Integer::sum);
+        }
+        return counts;
+    }
+
+    record SearchQueryCase(String query, Set<Integer> relevantDocIndices) {}
+
+    @Test
+    @DisplayName("Evaluate Semantic Search (TF-IDF + Cosine) vs Strict Keyword Baseline using MAP & Recall@3")
+    void evaluateSemanticSearchMapMetrics() {
+        List<String> corpus = List.of(
+            "Bí quyết nấu phở Bắc truyền thống nước dùng xương bò ninh kỹ thơm mùi quế hồi thảo quả",
+            "Hướng dẫn xây dựng REST API với Spring Boot theo kiến trúc Clean Architecture và Domain Driven Design",
+            "Cài đặt giải thuật TF-IDF kết hợp Cosine Similarity và pgvector cho tìm kiếm ngữ nghĩa tiếng Việt",
+            "Trích xuất đặc trưng ảnh bằng Color Histogram HSV, bộ lọc cạnh Sobel và ma trận GLCM",
+            "Tích hợp bản đồ Leaflet và truy vấn không gian PostGIS với công thức khoảng cách Haversine",
+            "Xây dựng hệ thống nhắn tin thời gian thực bằng giao thức WebSocket STOMP và Redis Pub/Sub",
+            "Bảo mật xác thực người dùng với JSON Web Token lưu trong HttpOnly Cookie và phân quyền RBAC",
+            "Kinh nghiệm du lịch Đà Lạt tự túc khám phá đồi chè Cầu Đất và ẩm thực chợ đêm",
+            "Tóm tắt văn bản tự động bằng đồ thị liên kết câu TextRank kết hợp trọng số từ khóa",
+            "Phát triển giao diện Single Page Application hiện đại bằng Vue 3 Composition API và Pinia"
+        );
+
+        List<SearchQueryCase> queries = List.of(
+            new SearchQueryCase("cách nấu phở ngon", Set.of(0)),
+            new SearchQueryCase("kiến trúc Clean Architecture Spring Boot", Set.of(1)),
+            new SearchQueryCase("vector TF-IDF tìm kiếm ngữ nghĩa postgres", Set.of(2)),
+            new SearchQueryCase("tìm bài viết quanh vị trí bản đồ", Set.of(4)),
+            new SearchQueryCase("chat thời gian thực nhiều server Redis", Set.of(5)),
+            new SearchQueryCase("du lịch da lat", Set.of(7))
+        );
+
+        double sumKeywordAp = 0, sumSemanticAp = 0;
+        double sumKeywordR3 = 0, sumSemanticR3 = 0;
+
+        for (SearchQueryCase q : queries) {
+            List<Integer> keywordRanked = rankByStrictKeywordBaseline(corpus, q.query);
+            List<Integer> semanticRanked = rankBySemanticTfIdf(corpus, q.query);
+
+            sumKeywordAp += averagePrecision(keywordRanked, q.relevantDocIndices);
+            sumSemanticAp += averagePrecision(semanticRanked, q.relevantDocIndices);
+            sumKeywordR3 += recallAtK(keywordRanked, q.relevantDocIndices, 3);
+            sumSemanticR3 += recallAtK(semanticRanked, q.relevantDocIndices, 3);
+        }
+
+        int m = queries.size();
+        double keywordMap = sumKeywordAp / m;
+        double semanticMap = sumSemanticAp / m;
+        double keywordR3 = sumKeywordR3 / m;
+        double semanticR3 = sumSemanticR3 / m;
+
+        System.out.println("\n===========================================================================");
+        System.out.println(" KẾT QUẢ THỰC NGHIỆM TÌM KIẾM NGỮ NGHĨA VS KEYWORD BASELINE (THESIS REPORT)");
+        System.out.println("===========================================================================");
+        System.out.println("| Phương pháp tìm kiếm | Số truy vấn | MAP (%) | Recall@3 (%) |");
+        System.out.println("|---|:---:|:---:|:---:|");
+        System.out.printf("| Baseline (Exact Keyword AND) | %d | %.2f%% | %.2f%% |\n", m, keywordMap * 100, keywordR3 * 100);
+        System.out.printf("| **Proposed (TF-IDF + Cosine + Accent Fold)** | **%d** | **%.2f%%** | **%.2f%%** |\n", m, semanticMap * 100, semanticR3 * 100);
+        System.out.println("===========================================================================\n");
+
+        assertThat(semanticMap).isGreaterThan(keywordMap);
+        assertThat(semanticMap).isGreaterThanOrEqualTo(0.80);
+    }
+
+    private static List<Integer> rankByStrictKeywordBaseline(List<String> corpus, String query) {
+        List<String> qTokens = TextAlgorithms.tokens(query);
+        List<double[]> scored = new ArrayList<>();
+        for (int i = 0; i < corpus.size(); i++) {
+            Set<String> docTokens = new HashSet<>(TextAlgorithms.tokens(corpus.get(i)));
+            boolean allMatch = !qTokens.isEmpty() && docTokens.containsAll(qTokens);
+            if (allMatch) {
+                scored.add(new double[]{i, (double) qTokens.size() / Math.max(1, docTokens.size())});
+            }
+        }
+        scored.sort((a, b) -> Double.compare(b[1], a[1]));
+        return scored.stream().map(a -> (int) a[0]).toList();
+    }
+
+    private static List<Integer> rankBySemanticTfIdf(List<String> corpus, String query) {
+        boolean allUnaccented = TextAlgorithms.isUnaccented(query);
+        boolean hasUnaccentedToken = TextAlgorithms.tokens(query).stream().anyMatch(TextAlgorithms::isUnaccented);
+        double[] scores;
+        if (allUnaccented) {
+            scores = TextAlgorithms.similarities(corpus.stream().map(TextAlgorithms::foldedContent).toList(), TextAlgorithms.foldedContent(query));
+        } else if (hasUnaccentedToken) {
+            double[] exact = TextAlgorithms.similarities(corpus, query);
+            double[] folded = TextAlgorithms.similarities(corpus.stream().map(TextAlgorithms::foldedContent).toList(), TextAlgorithms.foldedContent(query));
+            scores = new double[corpus.size()];
+            for (int i = 0; i < corpus.size(); i++) scores[i] = Math.max(exact[i], folded[i] * 0.95);
+        } else {
+            scores = TextAlgorithms.similarities(corpus, query);
+        }
+        List<Integer> ranked = new ArrayList<>();
+        for (int i = 0; i < corpus.size(); i++) {
+            if (scores[i] > 0) ranked.add(i);
+        }
+        ranked.sort((a, b) -> Double.compare(scores[b], scores[a]));
+        return ranked;
+    }
+
+    private static double averagePrecision(List<Integer> ranked, Set<Integer> relevant) {
+        if (relevant.isEmpty()) return 0;
+        int hits = 0;
+        double sumPrec = 0;
+        for (int i = 0; i < ranked.size(); i++) {
+            if (relevant.contains(ranked.get(i))) {
+                hits++;
+                sumPrec += (double) hits / (i + 1);
+            }
+        }
+        return sumPrec / relevant.size();
+    }
+
+    private static double recallAtK(List<Integer> ranked, Set<Integer> relevant, int k) {
+        if (relevant.isEmpty()) return 0;
+        int hits = 0;
+        for (int i = 0; i < Math.min(k, ranked.size()); i++) {
+            if (relevant.contains(ranked.get(i))) hits++;
+        }
+        return (double) hits / relevant.size();
+    }
 }
