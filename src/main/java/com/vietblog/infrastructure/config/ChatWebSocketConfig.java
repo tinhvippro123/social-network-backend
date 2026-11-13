@@ -10,8 +10,9 @@ public class ChatWebSocketConfig implements WebSocketConfigurer {
     private final ChatWebSocketHandler handler;
     private final String[] allowedOrigins;
     public ChatWebSocketConfig(ChatWebSocketHandler handler,
-            @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:5174,http://localhost:3000}") String[] allowedOrigins) {
-        this.handler = handler; this.allowedOrigins = allowedOrigins;
+            @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:5174,http://localhost:3000}") String allowedOrigins) {
+        this.handler = handler;
+        this.allowedOrigins = SecurityConfig.parseAllowedOrigins(allowedOrigins).toArray(String[]::new);
     }
     @Override public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, "/ws/chat", "/ws").setAllowedOrigins(allowedOrigins);
