@@ -34,7 +34,7 @@ public class Comment {
     @JoinColumn(name = "parent_id")
     private Comment parent;
 
-    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
     @OrderBy("createdAt ASC")
     @Builder.Default
     private List<Comment> replies = new ArrayList<>();

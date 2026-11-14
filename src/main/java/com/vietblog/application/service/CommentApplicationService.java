@@ -20,6 +20,7 @@ import com.vietblog.infrastructure.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -131,11 +132,47 @@ public class CommentApplicationService {
 
         Post post = postRepository.findLockedById(comment.getPost().getId())
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
+        promoteChildRepliesBeforeDelete(commentRepository, comment);
         commentRepository.delete(comment);
         commentRepository.flush();
         post.setCommentsCount(Math.toIntExact(commentRepository.countByPostId(post.getId())));
         postDomainService.calculateTrendingScore(post);
         cache.evict(PostApplicationService.TRENDING_IDS_CACHE_KEY);
+    }
+
+    /**
+     * Khi xóa bình luận trả lời (cấp con), chuyển các bình luận trả lời của nó lên bình luận cha gốc
+     * và lưu lại thông tin @replyTo để giữ nguyên ngữ cảnh cuộc trò chuyện (chuẩn Facebook).
+     */
+    public static void promoteChildRepliesBeforeDelete(CommentRepository commentRepository, Comment comment) {
+        if (comment == null || comment.getParent() == null
+                || comment.getReplies() == null || comment.getReplies().isEmpty()) {
+            return;
+        }
+        Comment upperParent = comment.getParent();
+        String targetName = comment.getAuthor() != null ? comment.getAuthor().getName() : null;
+        String targetAuthorId = comment.getAuthor() != null ? comment.getAuthor().getId() : null;
+
+        List<Comment> children = new ArrayList<>(comment.getReplies());
+        comment.getReplies().clear();
+        if (upperParent.getReplies() != null) {
+            upperParent.getReplies().remove(comment);
+        }
+
+        for (Comment child : children) {
+            child.setParent(upperParent);
+            if (upperParent.getReplies() != null && !upperParent.getReplies().contains(child)) {
+                upperParent.getReplies().add(child);
+            }
+            if (targetName != null
+                    && (child.getAuthor() == null || !child.getAuthor().getId().equals(targetAuthorId))
+                    && !CommentResponse.hasReplyToPrefix(child.getContent())) {
+                String currentContent = child.getContent() != null ? child.getContent() : "";
+                child.setContent(CommentResponse.formatReplyToPrefix(targetName, targetAuthorId) + currentContent);
+            }
+            commentRepository.save(child);
+        }
+        commentRepository.flush();
     }
 
     @Transactional

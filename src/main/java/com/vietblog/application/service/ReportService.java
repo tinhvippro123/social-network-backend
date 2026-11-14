@@ -238,6 +238,7 @@ public class ReportService {
             });
             case COMMENT -> comments.findById(report.getTargetId()).ifPresent(comment -> {
                 Post post = comment.getPost();
+                CommentApplicationService.promoteChildRepliesBeforeDelete(comments, comment);
                 comments.delete(comment);
                 comments.flush();
                 if (post != null) {

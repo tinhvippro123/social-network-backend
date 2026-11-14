@@ -28,6 +28,7 @@ class PostInteractionIntegrationTest extends VietblogBackendApplicationTests {
     @Autowired BookmarkRepository bookmarks;
     @Autowired JwtTokenProvider jwt;
     @Autowired PostApplicationService postService;
+    @Autowired jakarta.persistence.EntityManager em;
     MockMvc mvc;
     User owner;
     User reader;
@@ -94,6 +95,47 @@ class PostInteractionIntegrationTest extends VietblogBackendApplicationTests {
         assertThat(comments.countByPostId(post.getId())).isZero();
         assertThat(reactions.findByPostId(post.getId())).isEmpty();
         assertThat(bookmarks.existsByUserIdAndPostId(reader.getId(), post.getId())).isFalse();
+    }
+
+    @Test void deletingChildReplyPromotesSubRepliesWithMentionWhileDeletingRootRemovesEntireThread() throws Exception {
+        Comment rootA = comments.save(Comment.builder().post(post).author(owner).content("Bình luận gốc A").build());
+        Comment replyB = comments.save(Comment.builder().post(post).author(reader).parent(rootA).content("Phản hồi B").build());
+        Comment subReplyC = comments.save(Comment.builder().post(post).author(owner).parent(replyB).content("Đồng ý với bạn").build());
+        post.setCommentsCount(3);
+        posts.saveAndFlush(post);
+        em.flush();
+        em.clear();
+
+        mvc.perform(delete("/api/posts/{postId}/comments/{commentId}", post.getId(), replyB.getId())
+                        .header("Authorization", token(reader)))
+                .andExpect(status().isOk());
+
+        em.flush();
+        em.clear();
+
+        assertThat(comments.findById(replyB.getId())).isEmpty();
+        assertThat(comments.findById(rootA.getId())).isPresent();
+        Comment persistedC = comments.findById(subReplyC.getId()).orElseThrow();
+        assertThat(persistedC.getParent().getId()).isEqualTo(rootA.getId());
+        assertThat(posts.findById(post.getId()).orElseThrow().getCommentsCount()).isEqualTo(2);
+
+        mvc.perform(get("/api/posts/{id}/comments", post.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(rootA.getId()))
+                .andExpect(jsonPath("$.data[0].replies.length()").value(1))
+                .andExpect(jsonPath("$.data[0].replies[0].id").value(subReplyC.getId()))
+                .andExpect(jsonPath("$.data[0].replies[0].content").value("Đồng ý với bạn"))
+                .andExpect(jsonPath("$.data[0].replies[0].replyTo").value(reader.getName()))
+                .andExpect(jsonPath("$.data[0].replies[0].replyToAuthorId").value(reader.getId()));
+
+        em.flush();
+        em.clear();
+
+        mvc.perform(delete("/api/posts/{postId}/comments/{commentId}", post.getId(), rootA.getId())
+                        .header("Authorization", token(owner)))
+                .andExpect(status().isOk());
+
+        assertThat(comments.countByPostId(post.getId())).isZero();
     }
 
 }

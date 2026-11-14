@@ -9,6 +9,7 @@ import java.util.stream.IntStream;
 public final class TextAlgorithms {
     public static final int TEXT_VECTOR_DIMENSIONS = 256;
     private static final Pattern TAGS = Pattern.compile("<[^>]*>");
+    private static final Pattern COMMENT_EMBED_TAGS = Pattern.compile("\\[(?:replyTo|img):[^\\]]+\\]");
     private static final Pattern WORDS = Pattern.compile("[\\p{L}\\p{N}]+");
     private static final Set<String> POSITIVE = loadWords("/nlp/positive_words.txt", Set.of(
             "tốt", "hay", "đẹp", "thích", "yêu", "tuyệt", "vui", "đỉnh", "chuẩn", "xịn", "mê", "ngon", "giỏi", "pro",
@@ -89,7 +90,8 @@ public final class TextAlgorithms {
 
     public static String plainText(String text) {
         if (text == null) return "";
-        return TAGS.matcher(text.replaceAll("(?is)<(script|style)\\b[^>]*>.*?</\\1>", " ")).replaceAll(" ")
+        String cleaned = COMMENT_EMBED_TAGS.matcher(text).replaceAll(" ");
+        return TAGS.matcher(cleaned.replaceAll("(?is)<(script|style)\\b[^>]*>.*?</\\1>", " ")).replaceAll(" ")
                 .replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">")
                 .replace("&quot;", "\"").replace("&#39;", "'").replace("&apos;", "'")
                 .replace("&amp;", "&")
