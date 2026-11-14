@@ -105,10 +105,24 @@ public class CommentApplicationService {
                 .orElseThrow(() -> new ResourceNotFoundException(ErrorCode.POST_NOT_FOUND));
         // Chỉ lấy các comment bậc 1 (parent == null), 
         // bên trong CommentResponse.fromEntity sẽ đệ quy tự động map các replies
-        List<Comment> topLevelComments = commentRepository.findByPostIdAndParentIsNullOrderByCreatedAtDesc(postId);
-        
+        List<Comment> allComments = commentRepository.findAllByPostIdWithAuthor(postId);
+        java.util.Map<String, List<Comment>> repliesByParentId = new java.util.HashMap<>();
+        List<Comment> topLevelComments = new ArrayList<>();
+        for (Comment comment : allComments) {
+            if (comment.getParent() == null) {
+                topLevelComments.add(comment);
+            } else {
+                repliesByParentId
+                        .computeIfAbsent(comment.getParent().getId(), ignored -> new ArrayList<>())
+                        .add(comment);
+            }
+        }
+        topLevelComments.sort(java.util.Comparator
+                .comparing(Comment::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
+                .reversed());
+
         return topLevelComments.stream()
-                .map(CommentResponse::fromEntity)
+                .map(comment -> CommentResponse.fromEntity(comment, repliesByParentId))
                 .collect(Collectors.toList());
     }
 

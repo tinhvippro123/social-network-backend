@@ -14,9 +14,14 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, String> {
     @Modifying
     @Query("delete from Bookmark b where b.post.id = :postId")
     void deleteForPost(@Param("postId") String postId);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"post", "post.author", "post.category"})
     Page<Bookmark> findByUserIdAndPostStatusOrderByCreatedAtDesc(
             String userId, Post.PostStatus status, Pageable pageable);
     Optional<Bookmark> findByUserIdAndPostId(String userId, String postId);
     boolean existsByUserIdAndPostId(String userId, String postId);
+
+    @Query("select b.post.id from Bookmark b where b.user.id = :userId and b.post.id in :postIds")
+    java.util.List<String> findBookmarkedPostIds(@Param("userId") String userId, @Param("postIds") java.util.Collection<String> postIds);
+
     void deleteByUserIdAndPostId(String userId, String postId);
 }

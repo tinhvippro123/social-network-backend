@@ -15,6 +15,9 @@ public interface UserRepository extends JpaRepository<User, String> {
     @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM User u JOIN u.followers f WHERE u.id = :targetUserId AND f.id = :currentUserId")
     boolean isFollowing(@Param("targetUserId") String targetUserId, @Param("currentUserId") String currentUserId);
 
+    @Query("SELECT u.id FROM User u JOIN u.followers f WHERE f.id = :currentUserId AND u.id IN :targetUserIds")
+    List<String> findFollowedUserIds(@Param("currentUserId") String currentUserId, @Param("targetUserIds") java.util.Collection<String> targetUserIds);
+
     @Query("SELECT f FROM User u JOIN u.followers f WHERE u.id = :userId")
     List<User> findFollowersByUserId(@Param("userId") String userId);
 

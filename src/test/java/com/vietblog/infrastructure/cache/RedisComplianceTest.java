@@ -69,7 +69,8 @@ class RedisComplianceTest {
 
         Category cat = Category.builder().id("cat-1").name("Trí tuệ nhân tạo").slug("tri-tue-nhan-tao").build();
         when(categoryRepo.findAll()).thenReturn(List.of(cat));
-        when(postRepo.countByCategoryIdAndStatus(eq("cat-1"), any())).thenReturn(5L);
+        when(postRepo.countByCategoryIdsAndStatus(eq(List.of("cat-1")), any()))
+                .thenReturn(List.<Object[]>of(new Object[]{"cat-1", 5L}));
         when(cache.get(CategoryApplicationService.CATEGORIES_CACHE_KEY)).thenReturn(Optional.empty());
 
         CategoryApplicationService service = new CategoryApplicationService(categoryRepo, domainService, postRepo, cache, json);

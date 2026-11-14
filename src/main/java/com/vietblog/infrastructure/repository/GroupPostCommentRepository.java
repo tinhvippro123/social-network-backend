@@ -15,4 +15,7 @@ public interface GroupPostCommentRepository extends JpaRepository<GroupPostComme
     @Modifying
     @Query("DELETE FROM GroupPostComment c WHERE c.post.group.id = :groupId")
     void deleteByGroupId(@Param("groupId") String groupId);
+
+    @Query("select c.post.id, count(c) from GroupPostComment c where c.post.id in :postIds group by c.post.id")
+    List<Object[]> countByPostIds(@Param("postIds") java.util.Collection<String> postIds);
 }

@@ -106,7 +106,13 @@ public class AdminService {
     @Transactional(readOnly = true)
     public Page<AdminDtos.UserResponse> users(User.Role role, String search, int page, int limit) {
         String q = search == null ? "" : search.trim();
-        return users.search(role, q, page(page, limit, "joinedAt")).map(this::toUserResponse);
+        Page<User> userPage = users.search(role, q, page(page, limit, "joinedAt"));
+        if (userPage.isEmpty()) {
+            return userPage.map(this::toUserResponse);
+        }
+        var userIds = userPage.getContent().stream().map(User::getId).toList();
+        var counts = BatchLookup.toCountMap(posts.countByAuthorIds(userIds));
+        return userPage.map(u -> AdminDtos.UserResponse.from(u, counts.getOrDefault(u.getId(), 0L)));
     }
 
     private AdminDtos.UserResponse toUserResponse(User user) {
@@ -122,10 +128,7 @@ public class AdminService {
             return paged.map(AdminDtos.PostResponse::from);
         }
         var ids = paged.getContent().stream().map(Post::getId).toList();
-        var counts = new java.util.HashMap<String, Long>();
-        for (Object[] row : reports.countByTargetIds(Report.TargetType.POST, ids)) {
-            counts.put((String) row[0], ((Number) row[1]).longValue());
-        }
+        var counts = BatchLookup.toCountMap(reports.countByTargetIds(Report.TargetType.POST, ids));
         return paged.map(p -> AdminDtos.PostResponse.from(p, counts.getOrDefault(p.getId(), 0L)));
     }
 

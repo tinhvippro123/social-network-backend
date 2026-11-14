@@ -24,6 +24,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        default_batch_fetch_size: 50
 
   # ── Redis 7+ (Distributed Cache + Chat Pub/Sub) ──
   data:

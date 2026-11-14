@@ -144,9 +144,10 @@ public class SearchApplicationService {
             Set<String> terms = new HashSet<>(TextAlgorithms.tokens(query));
             scores = texts.stream().map(text -> keywordScore(terms, TextAlgorithms.tokens(text))).mapToDouble(Double::doubleValue).toArray();
         }
-        return IntStream.range(0, corpus.size()).boxed().filter(i -> scores[i] > 0)
+        List<Post> matched = IntStream.range(0, corpus.size()).boxed().filter(i -> scores[i] > 0)
                 .sorted(Comparator.<Integer>comparingDouble(i -> scores[i]).reversed().thenComparingInt(i -> i)).limit(limit)
-                .map(i -> toPostResponse(corpus.get(i), viewerId)).toList();
+                .map(corpus::get).toList();
+        return toPostSummaries(matched, viewerId);
     }
 
     private List<Post> semanticCorpus(String query, int limit, boolean folded) {
@@ -208,9 +209,10 @@ public class SearchApplicationService {
         Map<String, Post> byId = corpus.stream().collect(Collectors.toMap(Post::getId, post -> post));
         Map<String, Double> scores = new HashMap<>();
         imageIndex.findByPostIdIn(byId.keySet()).forEach(index -> scores.put(index.getPostId(), ImageAlgorithms.cosine(query, decode(index.getFeatures()))));
-        return scores.entrySet().stream().filter(entry -> entry.getValue() > 0)
+        List<Post> matched = scores.entrySet().stream().filter(entry -> entry.getValue() > 0)
                 .sorted(Map.Entry.<String, Double>comparingByValue().reversed().thenComparing(Map.Entry::getKey)).limit(limit)
-                .map(entry -> toPostResponse(byId.get(entry.getKey()), viewerId)).toList();
+                .map(entry -> byId.get(entry.getKey())).toList();
+        return toPostSummaries(matched, viewerId);
     }
 
     @Transactional
@@ -250,17 +252,32 @@ public class SearchApplicationService {
         }
 
         ToDoubleFunction<Post> distance = post -> GeoAlgorithms.distanceKm(latitude, longitude, post.getLatitude(), post.getLongitude());
-        return candidates.stream()
+        List<Post> matched = candidates.stream()
                 .filter(post -> post.getLatitude() != null && post.getLongitude() != null)
                 .filter(post -> distance.applyAsDouble(post) <= radiusKm)
                 .sorted(Comparator.comparingDouble(distance).thenComparing(Post::getId)).limit(limit)
-                .map(post -> toPostResponse(post, viewerId)).toList();
+                .toList();
+        return toPostSummaries(matched, viewerId);
     }
 
-    private PostResponse toPostResponse(Post post, String viewerId) {
-        int authorPostsCount = post.getAuthor() != null ? post.getAuthor().getPostsCount() : 0;
-        boolean isBookmarked = viewerId != null && bookmarks.existsByUserIdAndPostId(viewerId, post.getId());
-        return PostResponse.fromEntity(post, authorPostsCount, isBookmarked);
+    private List<PostResponse> toPostSummaries(List<Post> resultPosts, String viewerId) {
+        if (resultPosts.isEmpty()) {
+            return List.of();
+        }
+        Set<String> bookmarkedPostIds;
+        if (viewerId != null) {
+            List<String> postIds = resultPosts.stream().map(Post::getId).toList();
+            bookmarkedPostIds = new HashSet<>(bookmarks.findBookmarkedPostIds(viewerId, postIds));
+        } else {
+            bookmarkedPostIds = Set.of();
+        }
+        return resultPosts.stream()
+                .map(post -> {
+                    int authorPostsCount = post.getAuthor() != null ? post.getAuthor().getPostsCount() : 0;
+                    boolean isBookmarked = bookmarkedPostIds.contains(post.getId());
+                    return PostResponse.fromSummary(post, authorPostsCount, isBookmarked);
+                })
+                .toList();
     }
 
     public SummaryResponse summary(String postId, int sentences) {

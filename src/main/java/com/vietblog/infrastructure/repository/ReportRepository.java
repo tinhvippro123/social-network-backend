@@ -12,6 +12,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ReportRepository extends JpaRepository<Report, String> {
+    @Override
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"reporter", "resolvedBy"})
+    Page<Report> findAll(Pageable pageable);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"reporter", "resolvedBy"})
     Page<Report> findByStatus(Report.ReportStatus status, Pageable pageable);
     long countByStatus(Report.ReportStatus status);
     List<Report> findTop5ByOrderByCreatedAtDesc();

@@ -23,6 +23,9 @@ public interface AdminPostRepository extends JpaRepository<Post, String> {
 
     long countByAuthorId(String authorId);
 
+    @Query("select p.author.id, count(p) from Post p where p.author.id in :authorIds group by p.author.id")
+    java.util.List<Object[]> countByAuthorIds(@Param("authorIds") java.util.Collection<String> authorIds);
+
     @Query("select coalesce(sum(p.viewsCount), 0) from Post p")
     long countTotalViews();
 

@@ -88,8 +88,17 @@ public class CategoryApplicationService {
             }
         }
 
-        List<CategoryResponse> responses = categoryRepository.findAll().stream()
-                .map(this::toCategoryResponse)
+        List<Category> categories = categoryRepository.findAll();
+        List<String> categoryIds = categories.stream().map(Category::getId).toList();
+        java.util.Map<String, Long> publishedCounts = categoryIds.isEmpty()
+                ? java.util.Map.of()
+                : BatchLookup.toCountMap(
+                        postRepository.countByCategoryIdsAndStatus(categoryIds, Post.PostStatus.PUBLISHED));
+
+        List<CategoryResponse> responses = categories.stream()
+                .map(category -> CategoryResponse.fromEntity(
+                        category,
+                        Math.toIntExact(publishedCounts.getOrDefault(category.getId(), 0L))))
                 .collect(Collectors.toList());
 
         if (json != null) {

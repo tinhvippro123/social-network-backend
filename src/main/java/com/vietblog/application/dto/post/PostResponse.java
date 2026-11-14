@@ -59,11 +59,20 @@ public class PostResponse {
     }
 
     public static PostResponse fromEntity(Post post, int authorPostsCount, boolean bookmarked) {
+        return buildResponse(post, post.getContent(), authorPostsCount, bookmarked);
+    }
+
+    /** List-view summary mapping that omits full HTML content while keeping excerpt and metadata intact. */
+    public static PostResponse fromSummary(Post post, int authorPostsCount, boolean bookmarked) {
+        return buildResponse(post, "", authorPostsCount, bookmarked);
+    }
+
+    private static PostResponse buildResponse(Post post, String content, int authorPostsCount, boolean bookmarked) {
         return PostResponse.builder()
                 .id(post.getId())
                 .title(post.getTitle())
                 .excerpt(post.getExcerpt())
-                .content(post.getContent())
+                .content(content)
                 .coverImage(post.getCoverImage())
                 .author(AuthorDto.builder()
                         .id(post.getAuthor().getId())

@@ -100,7 +100,27 @@ public class ReportService {
     @Transactional(readOnly = true)
     public Page<ReportDtos.Response> list(Report.ReportStatus status, int page, int limit) {
         var pageable = AdminService.page(page, limit, "createdAt");
-        return (status == null ? reports.findAll(pageable) : reports.findByStatus(status, pageable)).map(this::toResponse);
+        Page<Report> reportPage = status == null ? reports.findAll(pageable) : reports.findByStatus(status, pageable);
+        if (reportPage.isEmpty()) {
+            return reportPage.map(this::toResponse);
+        }
+        var commentIds = reportPage.getContent().stream()
+                .filter(r -> r.getType() == Report.TargetType.COMMENT)
+                .map(Report::getTargetId)
+                .distinct()
+                .toList();
+        var commentPostIds = commentIds.isEmpty()
+                ? java.util.Map.<String, String>of()
+                : BatchLookup.toStringMap(comments.findPostIdsByCommentIds(commentIds));
+
+        return reportPage.map(report -> {
+            String targetPostId = switch (report.getType()) {
+                case POST -> report.getTargetId();
+                case COMMENT -> commentPostIds.get(report.getTargetId());
+                default -> null;
+            };
+            return ReportDtos.Response.from(report, targetPostId);
+        });
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")

@@ -180,31 +180,13 @@ public class UserApplicationService {
     @Transactional(readOnly = true)
     public List<UserSummaryResponse> getUserFollowers(String targetUserId, String currentUserId) {
         requireProfileVisible(targetUserId, currentUserId);
-
-        List<User> followers = userRepository.findFollowersByUserId(targetUserId);
-        return followers.stream()
-                .map(u -> {
-                    boolean isFollowing = currentUserId != null && userRepository.isFollowing(u.getId(), currentUserId);
-                    int postsCount = Math.max(u.getPostsCount(),
-                            (int) postRepository.countByAuthorIdAndStatus(u.getId(), Post.PostStatus.PUBLISHED));
-                    return UserSummaryResponse.fromEntity(u, isFollowing, postsCount);
-                })
-                .toList();
+        return toUserSummaries(userRepository.findFollowersByUserId(targetUserId), currentUserId);
     }
 
     @Transactional(readOnly = true)
     public List<UserSummaryResponse> getUserFollowing(String targetUserId, String currentUserId) {
         requireProfileVisible(targetUserId, currentUserId);
-
-        List<User> following = userRepository.findFollowingByUserId(targetUserId);
-        return following.stream()
-                .map(u -> {
-                    boolean isFollowing = currentUserId != null && userRepository.isFollowing(u.getId(), currentUserId);
-                    int postsCount = Math.max(u.getPostsCount(),
-                            (int) postRepository.countByAuthorIdAndStatus(u.getId(), Post.PostStatus.PUBLISHED));
-                    return UserSummaryResponse.fromEntity(u, isFollowing, postsCount);
-                })
-                .toList();
+        return toUserSummaries(userRepository.findFollowingByUserId(targetUserId), currentUserId);
     }
 
     @Transactional(readOnly = true)
@@ -215,13 +197,29 @@ public class UserApplicationService {
         Pageable pageable = PageRequest.of(0, limit + 1);
         List<User> topUsers = userRepository.findTopUsers(pageable);
 
-        return topUsers.stream()
+        List<User> recommended = topUsers.stream()
                 .filter(u -> currentUserId == null || !u.getId().equals(currentUserId))
                 .limit(limit)
+                .toList();
+        return toUserSummaries(recommended, currentUserId);
+    }
+
+    private List<UserSummaryResponse> toUserSummaries(List<User> users, String currentUserId) {
+        if (users.isEmpty()) {
+            return List.of();
+        }
+        List<String> userIds = users.stream().map(User::getId).toList();
+        java.util.Set<String> followedIds = currentUserId == null
+                ? java.util.Set.of()
+                : new java.util.HashSet<>(userRepository.findFollowedUserIds(currentUserId, userIds));
+        java.util.Map<String, Long> postCounts = BatchLookup.toCountMap(
+                postRepository.countByAuthorIdsAndStatus(userIds, Post.PostStatus.PUBLISHED));
+
+        return users.stream()
                 .map(u -> {
-                    boolean isFollowing = currentUserId != null && userRepository.isFollowing(u.getId(), currentUserId);
+                    boolean isFollowing = followedIds.contains(u.getId());
                     int postsCount = Math.max(u.getPostsCount(),
-                            (int) postRepository.countByAuthorIdAndStatus(u.getId(), Post.PostStatus.PUBLISHED));
+                            postCounts.getOrDefault(u.getId(), 0L).intValue());
                     return UserSummaryResponse.fromEntity(u, isFollowing, postsCount);
                 })
                 .toList();
@@ -251,10 +249,14 @@ public class UserApplicationService {
 
         Page<Post> postPage = postRepository.findByAuthorIdAndStatus(targetUserId, postStatus, pageable);
         int authorPostsCount = (int) postRepository.countByAuthorIdAndStatus(targetUserId, Post.PostStatus.PUBLISHED);
+        List<String> postIds = postPage.getContent().stream().map(Post::getId).toList();
+        java.util.Set<String> bookmarkedPostIds = (viewerId == null || postIds.isEmpty())
+                ? java.util.Set.of()
+                : new java.util.HashSet<>(bookmarkRepository.findBookmarkedPostIds(viewerId, postIds));
 
         return postPage.map(post -> {
-            boolean isBookmarked = viewerId != null && bookmarkRepository.existsByUserIdAndPostId(viewerId, post.getId());
-            return PostResponse.fromEntity(post, authorPostsCount, isBookmarked);
+            boolean isBookmarked = bookmarkedPostIds.contains(post.getId());
+            return PostResponse.fromSummary(post, authorPostsCount, isBookmarked);
         });
     }
 

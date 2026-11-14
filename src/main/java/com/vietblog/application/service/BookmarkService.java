@@ -61,7 +61,7 @@ public class BookmarkService {
                 .map(bookmark -> {
                     Post p = bookmark.getPost();
                     int count = p.getAuthor() != null ? p.getAuthor().getPostsCount() : 0;
-                    return PostResponse.fromEntity(p, count, true);
+                    return PostResponse.fromSummary(p, count, true);
                 });
     }
 }

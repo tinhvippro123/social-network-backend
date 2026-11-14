@@ -161,8 +161,7 @@ public class PostApplicationService {
     public Page<PostResponse> getLatestPosts(int page, int limit) {
         validatePage(page, limit);
         PageRequest pageRequest = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return postRepository.findByStatus(Post.PostStatus.PUBLISHED, pageRequest)
-                .map(post -> mapPostResponse(post, null));
+        return mapPostSummaryPage(postRepository.findByStatus(Post.PostStatus.PUBLISHED, pageRequest), null);
     }
 
     @Transactional(readOnly = true)
@@ -180,13 +179,13 @@ public class PostApplicationService {
                     List<String> cachedIds = json.readValue(cached.get(), new TypeReference<List<String>>() {});
                     if (!cachedIds.isEmpty()) {
                         List<String> slice = cachedIds.subList(0, Math.min(limit, cachedIds.size()));
-                        Map<String, Post> found = postRepository.findAllById(slice).stream()
+                        Map<String, Post> found = postRepository.findAllWithDetailsByIdIn(slice).stream()
                                 .filter(p -> p.getStatus() == Post.PostStatus.PUBLISHED)
                                 .collect(Collectors.toMap(Post::getId, p -> p));
                         if (found.size() == slice.size()) {
-                            return slice.stream()
-                                    .map(id -> mapPostResponse(found.get(id), viewerId))
-                                    .collect(Collectors.toList());
+                            return mapPostSummaries(
+                                    slice.stream().map(found::get).collect(Collectors.toList()),
+                                    viewerId);
                         }
                     }
                 } catch (RuntimeException ignored) {
@@ -210,10 +209,7 @@ public class PostApplicationService {
             }
         }
 
-        return ranked.stream()
-                .limit(limit)
-                .map(post -> mapPostResponse(post, viewerId))
-                .collect(Collectors.toList());
+        return mapPostSummaries(ranked.stream().limit(limit).collect(Collectors.toList()), viewerId);
     }
 
     @Transactional
@@ -391,7 +387,7 @@ public class PostApplicationService {
             postPage = postRepository.findByStatus(Post.PostStatus.PUBLISHED, pageRequest);
         }
 
-        return postPage.map(post -> mapPostResponse(post, viewerId));
+        return mapPostSummaryPage(postPage, viewerId);
     }
 
     public void syncAuthorAndCategoryCounters(User author, Category category) {
@@ -453,6 +449,44 @@ public class PostApplicationService {
         String plain = TextAlgorithms.plainText(sanitizedContent == null ? "" : sanitizedContent).trim();
         if (plain.isEmpty()) return "";
         return plain.length() <= 200 ? plain : plain.substring(0, 197) + "...";
+    }
+
+    private org.springframework.data.domain.Page<PostResponse> mapPostSummaryPage(
+            org.springframework.data.domain.Page<Post> page, String viewerId) {
+        List<PostResponse> summaries = mapPostSummaries(page.getContent(), viewerId);
+        return new org.springframework.data.domain.PageImpl<>(summaries, page.getPageable(), page.getTotalElements());
+    }
+
+    private List<PostResponse> mapPostSummaries(List<Post> posts, String viewerId) {
+        if (posts.isEmpty()) {
+            return List.of();
+        }
+        List<String> authorIds = posts.stream()
+                .map(Post::getAuthor)
+                .filter(java.util.Objects::nonNull)
+                .map(com.vietblog.domain.entity.User::getId)
+                .distinct()
+                .toList();
+        Map<String, Long> authorPostCounts = authorIds.isEmpty()
+                ? Map.of()
+                : BatchLookup.toCountMap(
+                        postRepository.countByAuthorIdsAndStatus(authorIds, Post.PostStatus.PUBLISHED));
+
+        List<String> postIds = posts.stream().map(Post::getId).toList();
+        java.util.Set<String> bookmarkedPostIds = (viewerId == null || postIds.isEmpty())
+                ? java.util.Set.of()
+                : new java.util.HashSet<>(bookmarks.findBookmarkedPostIds(viewerId, postIds));
+
+        return posts.stream()
+                .map(post -> {
+                    int authorPostsCount = post.getAuthor() != null
+                            ? Math.max(post.getAuthor().getPostsCount(),
+                                    authorPostCounts.getOrDefault(post.getAuthor().getId(), 0L).intValue())
+                            : 0;
+                    boolean isBookmarked = bookmarkedPostIds.contains(post.getId());
+                    return PostResponse.fromSummary(post, authorPostsCount, isBookmarked);
+                })
+                .toList();
     }
 
     private PostResponse mapPostResponse(Post post, String viewerId) {

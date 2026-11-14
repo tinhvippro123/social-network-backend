@@ -16,4 +16,10 @@ public interface CommentRepository extends JpaRepository<Comment, String> {
     void deleteForPost(@Param("postId") String postId);
     long countByPostId(String postId);
     List<Comment> findByPostIdAndParentIsNullOrderByCreatedAtDesc(String postId);
+
+    @Query("select c from Comment c left join fetch c.author left join fetch c.parent p left join fetch p.author where c.post.id = :postId order by c.createdAt asc, c.id asc")
+    List<Comment> findAllByPostIdWithAuthor(@Param("postId") String postId);
+
+    @Query("select c.id, c.post.id from Comment c where c.id in :ids")
+    List<Object[]> findPostIdsByCommentIds(@Param("ids") java.util.Collection<String> ids);
 }

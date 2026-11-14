@@ -49,9 +49,42 @@ public class ChatService {
     @Transactional(readOnly = true)
     public Page<ConversationResponse> conversations(String userId, int page, int limit) {
         GroupService.page(page, limit);
-        return members.findByUserIdAndHiddenFalse(userId, PageRequest.of(page - 1, limit,
-                Sort.by(Sort.Order.desc("pinned"), Sort.Order.desc("conversation.updatedAt"), Sort.Order.desc("id"))))
-                .map(m -> conversation(m.getConversation(), m));
+        Page<ConversationMember> viewerPage = members.findByUserIdAndHiddenFalse(userId, PageRequest.of(page - 1, limit,
+                Sort.by(Sort.Order.desc("pinned"), Sort.Order.desc("conversation.updatedAt"), Sort.Order.desc("id"))));
+        if (viewerPage.isEmpty()) {
+            return viewerPage.map(m -> conversation(m.getConversation(), m));
+        }
+        List<String> conversationIds = viewerPage.getContent().stream()
+                .map(m -> m.getConversation().getId())
+                .toList();
+
+        Map<String, List<ConversationMember>> membersByConversation = new HashMap<>();
+        for (ConversationMember cm : members.findByConversationIdIn(conversationIds)) {
+            membersByConversation
+                    .computeIfAbsent(cm.getConversation().getId(), ignored -> new ArrayList<>())
+                    .add(cm);
+        }
+
+        Map<String, ChatMessage> latestByConversation = new HashMap<>();
+        Comparator<ChatMessage> latestOrder = Comparator.comparing(ChatMessage::getCreatedAt)
+                .thenComparing(ChatMessage::getId);
+        for (ChatMessage msg : messages.findLatestByConversationIds(conversationIds)) {
+            latestByConversation.merge(msg.getConversation().getId(), msg,
+                    (existing, candidate) -> latestOrder.compare(existing, candidate) >= 0 ? existing : candidate);
+        }
+
+        Map<String, Long> unreadByConversation = BatchLookup.toCountMap(
+                messages.countUnreadByConversationIds(conversationIds, userId));
+
+        return viewerPage.map(m -> {
+            String convId = m.getConversation().getId();
+            return buildConversationResponse(
+                    m.getConversation(),
+                    m,
+                    membersByConversation.getOrDefault(convId, List.of()),
+                    latestByConversation.get(convId),
+                    unreadByConversation.getOrDefault(convId, 0L));
+        });
     }
 
     public ConversationResponse create(String userId, ConversationRequest request) {
@@ -245,13 +278,23 @@ public class ChatService {
 
     private ConversationResponse conversation(Conversation conversation, ConversationMember viewer) {
         List<ConversationMember> allMembers = members.findByConversationId(conversation.getId());
+        ChatMessage latest = messages.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId()).orElse(null);
+        long unreadCount = messages.countUnread(conversation.getId(), viewer.getUser().getId(), viewer.getLastReadAt());
+        return buildConversationResponse(conversation, viewer, allMembers, latest, unreadCount);
+    }
+
+    private ConversationResponse buildConversationResponse(
+            Conversation conversation,
+            ConversationMember viewer,
+            List<ConversationMember> allMembers,
+            ChatMessage latest,
+            long unreadCount) {
         List<PublicUser> participants = allMembers.stream().map(m -> PublicUser.from(m.getUser())).toList();
         PublicUser other = participants.stream().filter(u -> !u.id().equals(viewer.getUser().getId())).findFirst().orElse(PublicUser.from(viewer.getUser()));
         ConversationMember otherMember = allMembers.stream().filter(m -> !m.getUser().getId().equals(viewer.getUser().getId())).findFirst().orElse(viewer);
         String nickname = conversation.isGroupChat() ? null : otherMember.getNickname();
         String displayName = conversation.isGroupChat() ? conversation.getName()
                 : (nickname != null && !nickname.isBlank() ? nickname : other.name());
-        ChatMessage latest = messages.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId()).orElse(null);
         String previewText = "";
         if (latest != null && !latest.isRevoked()) {
             if (latest.getContent() != null && !latest.getContent().isBlank()) {
@@ -270,7 +313,7 @@ public class ChatService {
         return new ConversationResponse(conversation.getId(), displayName,
                 conversation.isGroupChat() ? null : other.avatar(), previewText,
                 latest == null ? conversation.getCreatedAt() : latest.getCreatedAt(),
-                messages.countUnread(conversation.getId(), viewer.getUser().getId(), viewer.getLastReadAt()), conversation.isGroupChat(), isOnline,
+                unreadCount, conversation.isGroupChat(), isOnline,
                 viewer.isPinned(), viewer.isMuted(), participants, nickname);
     }
 

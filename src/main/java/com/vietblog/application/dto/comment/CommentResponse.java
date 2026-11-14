@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -43,7 +44,26 @@ public class CommentResponse {
 
     public static CommentResponse fromEntity(Comment comment) {
         if (comment == null) return null;
+        List<CommentResponse> replies = comment.getReplies() != null
+                ? comment.getReplies().stream()
+                        .map(CommentResponse::fromEntity) // Đệ quy map các reply
+                        .collect(Collectors.toList())
+                : List.of();
+        return buildResponse(comment, replies);
+    }
 
+    public static CommentResponse fromEntity(Comment comment, Map<String, List<Comment>> repliesByParentId) {
+        if (comment == null) return null;
+        List<Comment> children = repliesByParentId != null
+                ? repliesByParentId.getOrDefault(comment.getId(), List.of())
+                : List.of();
+        List<CommentResponse> replies = children.stream()
+                .map(child -> fromEntity(child, repliesByParentId))
+                .collect(Collectors.toList());
+        return buildResponse(comment, replies);
+    }
+
+    private static CommentResponse buildResponse(Comment comment, List<CommentResponse> replies) {
         String rawContent = comment.getContent() != null ? comment.getContent() : "";
         String cleanContent = rawContent;
         String replyTo = null;
@@ -78,11 +98,7 @@ public class CommentResponse {
                 .createdAt(comment.getCreatedAt())
                 .sentiment(sentimentResult.label())
                 .sentimentScore(sentimentResult.score())
-                .replies(comment.getReplies() != null 
-                        ? comment.getReplies().stream()
-                                .map(CommentResponse::fromEntity) // Đệ quy map các reply
-                                .collect(Collectors.toList())
-                        : List.of())
+                .replies(replies)
                 .build();
     }
 }

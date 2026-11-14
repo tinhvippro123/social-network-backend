@@ -33,8 +33,23 @@ public class GroupService {
             return Page.empty(page(page, limit));
         }
         boolean publicOnly = joined && !effectiveTargetId.equals(viewerId) && !isSystemMod(viewerId);
-        return groups.search(effectiveTargetId, joined, publicOnly, query == null ? "" : query.trim(), page(page, limit))
-                .map(g -> response(g, viewerId));
+        Page<Group> groupPage = groups.search(effectiveTargetId, joined, publicOnly, query == null ? "" : query.trim(), page(page, limit));
+        if (groupPage.isEmpty()) {
+            return groupPage.map(g -> response(g, viewerId));
+        }
+        java.util.List<String> groupIds = groupPage.getContent().stream().map(Group::getId).toList();
+        java.util.Map<String, Long> memberCounts = BatchLookup.toCountMap(members.countByGroupIds(groupIds));
+        java.util.Map<String, Long> postCounts = BatchLookup.toCountMap(posts.countByGroupIds(groupIds));
+        java.util.Map<String, GroupMember> memberships = (viewerId == null || viewerId.isBlank())
+                ? java.util.Map.of()
+                : members.findByGroupIdInAndUserId(groupIds, viewerId).stream()
+                        .collect(java.util.stream.Collectors.toMap(m -> m.getGroup().getId(), m -> m, (a, b) -> a));
+
+        return groupPage.map(g -> buildGroupResponse(
+                g,
+                memberCounts.getOrDefault(g.getId(), 0L),
+                postCounts.getOrDefault(g.getId(), 0L),
+                memberships.get(g.getId())));
     }
 
     @Transactional(readOnly = true)
@@ -121,7 +136,22 @@ public class GroupService {
     @Transactional(readOnly = true)
     public Page<GroupPostResponse> posts(String id, String userId, int page, int limit) {
         requireReadable(group(id), userId);
-        return posts.findByGroupId(id, page(page, limit)).map(p -> postResponse(p, userId));
+        Page<GroupPost> postPage = posts.findByGroupId(id, page(page, limit));
+        if (postPage.isEmpty()) {
+            return postPage.map(p -> postResponse(p, userId));
+        }
+        java.util.List<String> postIds = postPage.getContent().stream().map(GroupPost::getId).toList();
+        java.util.Map<String, Long> likeCounts = BatchLookup.toCountMap(postLikes.countByPostIds(postIds));
+        java.util.Map<String, Long> commentCounts = BatchLookup.toCountMap(postComments.countByPostIds(postIds));
+        java.util.Set<String> likedPostIds = (userId == null || userId.isBlank())
+                ? java.util.Set.of()
+                : new java.util.HashSet<>(postLikes.findLikedPostIds(userId, postIds));
+
+        return postPage.map(p -> GroupPostResponse.from(
+                p,
+                likeCounts.getOrDefault(p.getId(), 0L),
+                commentCounts.getOrDefault(p.getId(), 0L),
+                likedPostIds.contains(p.getId())));
     }
 
     @Transactional(readOnly = true)
@@ -232,8 +262,12 @@ public class GroupService {
     }
     private GroupResponse response(Group group, String userId) {
         GroupMember membership = members.findByGroupIdAndUserId(group.getId(), userId).orElse(null);
+        return buildGroupResponse(group, members.countByGroupId(group.getId()), posts.countByGroupId(group.getId()), membership);
+    }
+
+    private GroupResponse buildGroupResponse(Group group, long memberCount, long postCount, GroupMember membership) {
         return new GroupResponse(group.getId(), group.getName(), group.getDescription(), group.getAvatar(), group.getCoverImage(),
-                members.countByGroupId(group.getId()), posts.countByGroupId(group.getId()), membership != null, group.isPublicGroup(),
+                memberCount, postCount, membership != null, group.isPublicGroup(),
                 group.getCreatedAt(), PublicUser.from(group.getOwner()), membership == null ? null : membership.getRole().name());
     }
     private Group group(String id) { return groups.findById(id).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.GROUP_NOT_FOUND)); }
