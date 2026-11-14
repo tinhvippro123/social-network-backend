@@ -37,7 +37,7 @@ public class ExtendedDataSeeder implements CommandLineRunner {
     );
 
     private static final String DEFAULT_AVATAR =
-            "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80";
+            CommunityAndSocialCatalog.cartoonAvatar("VietBlog Member");
 
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
@@ -73,6 +73,7 @@ public class ExtendedDataSeeder implements CommandLineRunner {
 
         if (!needsRefresh) {
             ensureAndUpsertUsers(false);
+            syncLegacyAvatarsAndReports();
             syncAllCounters();
             log.info("Dataset version '{}' already active. Preserving existing platform content.", CURRENT_SEED_VERSION);
             return;
@@ -144,8 +145,12 @@ public class ExtendedDataSeeder implements CommandLineRunner {
                 if (student.getEmailVerified() == null) {
                     student.setEmailVerified(true);
                 }
-                if (student.getAvatar() == null || student.getAvatar().isBlank()) {
-                    student.setAvatar("https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80");
+                if (student.getAvatar() == null || student.getAvatar().isBlank()
+                        || CommunityAndSocialCatalog.isLegacyPortraitAvatar(student.getAvatar())) {
+                    String seed = (student.getName() != null && !student.getName().isBlank())
+                            ? student.getName()
+                            : studentEmail;
+                    student.setAvatar(CommunityAndSocialCatalog.cartoonAvatar(seed));
                 }
                 if (student.getBio() == null || student.getBio().isBlank()) {
                     student.setBio("Kỹ sư phát triển hệ thống VietBlog — Khoa Công nghệ Thông tin, Trường Đại học Tài nguyên và Môi trường TP.HCM (HCMUNRE).");
@@ -873,5 +878,79 @@ public class ExtendedDataSeeder implements CommandLineRunner {
         postRepository.flush();
         userRepository.flush();
         categoryRepository.flush();
+    }
+
+    /**
+     * Nâng cấp nhẹ các URL avatar chân dung Unsplash cũ (user, thông báo) sang avatar hoạt hình DiceBear
+     * và cập nhật lý do các báo cáo seed ở trạng thái PENDING sang nội dung kiểm duyệt thực tế
+     * mà tuyệt đối không ghi đè mật khẩu, tiểu sử hay dữ liệu tự tạo của người dùng.
+     */
+    private void syncLegacyAvatarsAndReports() {
+        Map<String, String> catalogAvatarsByEmail = new HashMap<>();
+        for (UserSeed seed : CommunityAndSocialCatalog.users()) {
+            catalogAvatarsByEmail.put(seed.email().toLowerCase(Locale.ROOT), seed.avatar());
+        }
+
+        List<User> updatedUsers = new ArrayList<>();
+        for (User user : userRepository.findAll()) {
+            String currentAvatar = user.getAvatar();
+            if (currentAvatar == null || currentAvatar.isBlank()
+                    || CommunityAndSocialCatalog.isLegacyPortraitAvatar(currentAvatar)) {
+                String emailKey = user.getEmail() != null ? user.getEmail().toLowerCase(Locale.ROOT) : "";
+                String nextAvatar = catalogAvatarsByEmail.get(emailKey);
+                if (nextAvatar == null) {
+                    String mapped = CommunityAndSocialCatalog.mapLegacyAvatarUrl(currentAvatar);
+                    String seed = (user.getName() != null && !user.getName().isBlank())
+                            ? user.getName()
+                            : emailKey;
+                    nextAvatar = mapped != null ? mapped : CommunityAndSocialCatalog.cartoonAvatar(seed);
+                }
+                if (!nextAvatar.equals(currentAvatar)) {
+                    user.setAvatar(nextAvatar);
+                    updatedUsers.add(user);
+                }
+            }
+        }
+        if (!updatedUsers.isEmpty()) {
+            userRepository.saveAll(updatedUsers);
+            userRepository.flush();
+        }
+
+        List<Notification> updatedNotifs = new ArrayList<>();
+        for (Notification notification : notificationRepository.findAll()) {
+            String mappedAvatar = CommunityAndSocialCatalog.mapLegacyAvatarUrl(notification.getAvatar());
+            if (mappedAvatar != null && !mappedAvatar.equals(notification.getAvatar())) {
+                notification.setAvatar(mappedAvatar);
+                updatedNotifs.add(notification);
+            }
+        }
+        if (!updatedNotifs.isEmpty()) {
+            notificationRepository.saveAll(updatedNotifs);
+            notificationRepository.flush();
+        }
+
+        List<ReportSeed> currentSeeds = CommunityAndSocialCatalog.reports();
+        if (currentSeeds.size() >= 3) {
+            Map<String, ReportSeed> legacyReasonMap = Map.of(
+                    "Đề xuất chuyển sang chuyên mục Đời sống", currentSeeds.get(0),
+                    "Nhận xét quy chụp thiếu khách quan", currentSeeds.get(1),
+                    "Cần bổ sung lưu ý cấu hình Reverse Proxy", currentSeeds.get(2)
+            );
+            List<Report> updatedReports = new ArrayList<>();
+            for (Report report : reportRepository.findAll()) {
+                if (report.getStatus() == Report.ReportStatus.PENDING && report.getReason() != null) {
+                    ReportSeed replacement = legacyReasonMap.get(report.getReason());
+                    if (replacement != null) {
+                        report.setReason(replacement.reason());
+                        report.setDescription(replacement.description());
+                        updatedReports.add(report);
+                    }
+                }
+            }
+            if (!updatedReports.isEmpty()) {
+                reportRepository.saveAll(updatedReports);
+                reportRepository.flush();
+            }
+        }
     }
 }

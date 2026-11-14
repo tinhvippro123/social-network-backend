@@ -4,7 +4,11 @@ import com.vietblog.domain.entity.Report;
 import com.vietblog.domain.entity.User;
 import com.vietblog.infrastructure.config.seed.SeedModels.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Danh mục hồ sơ thành viên, 8 nhóm cộng đồng chuyên biệt, hội thoại nhắn tin thời gian thực
@@ -12,77 +16,123 @@ import java.util.List;
  */
 public final class CommunityAndSocialCatalog {
 
+    private static final String DICEBEAR_BG_PALETTE = "b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf";
+
+    private static final Map<String, String> LEGACY_PORTRAIT_ID_TO_SEED = createLegacyPortraitMap();
+
     private CommunityAndSocialCatalog() {}
+
+    private static Map<String, String> createLegacyPortraitMap() {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("1534528741775", "Quản trị viên Hệ thống");
+        map.put("1535713875002", "Nguyễn Văn An");
+        map.put("1522075469751", "Phạm Minh Đức");
+        map.put("1472099645785", "Ngô Thành Long");
+        map.put("1507003211169", "Trần Đình Trọng");
+        map.put("1544005313", "Đặng Thị Mỹ Linh");
+        map.put("1494790108377", "Nguyễn Thu Trang");
+        map.put("1539571696357", "Đỗ Anh Khoa");
+        map.put("1517841905240", "Lê Hồng Nhung");
+        map.put("1524504388940", "Bùi Hoàng Yến");
+        map.put("1500648767791", "Vũ Quốc Tuấn");
+        map.put("1573496359142", "Hoàng Diệu Anh");
+        map.put("1506794778202", "Phan Quốc Bảo");
+        map.put("1580489944761", "Trần Thảo Chi");
+        return map;
+    }
+
+    public static String cartoonAvatar(String seed) {
+        String cleanSeed = (seed == null || seed.isBlank()) ? "VietBlog" : seed.trim();
+        String encoded = URLEncoder.encode(cleanSeed, StandardCharsets.UTF_8).replace("+", "%20");
+        return "https://api.dicebear.com/9.x/adventurer/svg?seed=" + encoded
+                + "&backgroundColor=" + DICEBEAR_BG_PALETTE;
+    }
+
+    public static boolean isLegacyPortraitAvatar(String avatarUrl) {
+        return mapLegacyAvatarUrl(avatarUrl) != null;
+    }
+
+    public static String mapLegacyAvatarUrl(String avatarUrl) {
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            return null;
+        }
+        for (Map.Entry<String, String> entry : LEGACY_PORTRAIT_ID_TO_SEED.entrySet()) {
+            if (avatarUrl.contains(entry.getKey())) {
+                return cartoonAvatar(entry.getValue());
+            }
+        }
+        return null;
+    }
 
     public static List<UserSeed> users() {
         return List.of(
                 new UserSeed("admin@vietblog.com", "Quản trị viên Hệ thống",
-                        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Quản trị viên Hệ thống"),
                         "Ban điều hành nền tảng chia sẻ tri thức cộng đồng VietBlog. Phụ trách định hướng nội dung, an toàn cộng đồng và kết nối học thuật.",
                         User.Role.ADMIN, 27),
 
                 new UserSeed("nguyenvanan@gmail.com", "Nguyễn Văn An",
-                        "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Nguyễn Văn An"),
                         "Kỹ sư phát triển Phần mềm Fullstack (Java Spring Boot & Vue 3). Yêu thích kiến trúc hệ thống thời gian thực, du lịch biển và góc làm việc tối giản.",
                         User.Role.USER, 25),
 
                 new UserSeed("phamminhduc@gmail.com", "Phạm Minh Đức",
-                        "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Phạm Minh Đức"),
                         "Senior Backend Architect chuyên sâu về Spring Boot, PostgreSQL và Clean Architecture. Điều phối viên nội dung kỹ thuật tại VietBlog.",
                         User.Role.MODERATOR, 23),
 
                 new UserSeed("ngothanhlong@gmail.com", "Ngô Thành Long",
-                        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Ngô Thành Long"),
                         "Chuyên gia An toàn Ứng dụng Web (AppSec & OWASP). Quan tâm tới xác thực phi trạng thái, phòng chống XSS và bảo vệ hạ tầng API.",
                         User.Role.MODERATOR, 21),
 
                 new UserSeed("trandinhtrong@gmail.com", "Trần Đình Trọng",
-                        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Trần Đình Trọng"),
                         "Kỹ sư DevOps & Cloud Infrastructure. Đam mê tự động hóa CI/CD, tối ưu container Docker và vận hành cụm cơ sở dữ liệu độ sẵn sàng cao.",
                         User.Role.USER, 18),
 
                 new UserSeed("dangthimylinh@gmail.com", "Đặng Thị Mỹ Linh",
-                        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Đặng Thị Mỹ Linh"),
                         "Kỹ sư Giao diện Frontend (Vue 3, TypeScript, Tailwind CSS). Theo đuổi trải nghiệm tương tác mượt mà và phương pháp quản trị tri thức cá nhân.",
                         User.Role.USER, 15),
 
                 new UserSeed("nguyenthutrang@gmail.com", "Nguyễn Thu Trang",
-                        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Nguyễn Thu Trang"),
                         "Chuyên viên Thiết kế Sản phẩm số (UI/UX & Design Systems). Tập trung vào khả năng tiếp cận WCAG và trải nghiệm đọc thanh lịch.",
                         User.Role.USER, 13),
 
                 new UserSeed("doanhkhoa@gmail.com", "Đỗ Anh Khoa",
-                        "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Đỗ Anh Khoa"),
                         "Nghiên cứu viên Xử lý Ngôn ngữ Tự nhiên (NLP tiếng Việt) & Khoa học Dữ liệu. Yêu thích các thuật toán đồ thị văn bản và tìm kiếm ngữ nghĩa.",
                         User.Role.USER, 10),
 
                 new UserSeed("lehongnhung@gmail.com", "Lê Hồng Nhung",
-                        "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Lê Hồng Nhung"),
                         "Cây viết Du lịch & Văn hóa bản địa. Đã đặt chân qua hơn 35 tỉnh thành Việt Nam để ghi lại những câu chuyện ẩm thực và di sản vùng miền.",
                         User.Role.USER, 8),
 
                 new UserSeed("buihoangyen@gmail.com", "Bùi Hoàng Yến",
-                        "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Bùi Hoàng Yến"),
                         "Nhiếp ảnh gia Đời sống & Người yêu cà phê thủ công tại Sài Gòn. Thích khám phá những không gian tĩnh lặng tràn ngập ánh sáng tự nhiên.",
                         User.Role.USER, 5),
 
                 new UserSeed("vuquoctuan@gmail.com", "Vũ Quốc Tuấn",
-                        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Vũ Quốc Tuấn"),
                         "Sinh viên năm cuối Khoa Công nghệ Thông tin — Trường Đại học Tài nguyên và Môi trường TP.HCM (HCMUNRE). Thành viên tích cực CLB Học thuật CNTT.",
                         User.Role.USER, 3),
 
                 new UserSeed("hoangdieuanh@gmail.com", "Hoàng Diệu Anh",
-                        "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Hoàng Diệu Anh"),
                         "Đối tác Phát triển Cộng đồng Công nghệ & Hướng nghiệp Kỹ sư trẻ. Cầu nối giữa các doanh nghiệp phần mềm và sinh viên các trường đại học.",
                         User.Role.USER, 2),
 
                 new UserSeed("phanquocbao@gmail.com", "Phan Quốc Bảo",
-                        "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Phan Quốc Bảo"),
                         "Kỹ sư Hệ thống Thông tin Địa lý (WebGIS & Bản đồ số). Đam mê ứng dụng dữ liệu không gian vào du lịch thông minh và quy hoạch đô thị.",
                         User.Role.USER, 0),
 
                 new UserSeed("tranthaochi@gmail.com", "Trần Thảo Chi",
-                        "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80",
+                        cartoonAvatar("Trần Thảo Chi"),
                         "Biên tập viên chuyên mục Đời sống xanh & Văn hóa đọc. Yêu những buổi sáng cuối tuần bên trang sách tại đường Nguyễn Văn Bình.",
                         User.Role.USER, 0)
         );
@@ -551,8 +601,8 @@ public final class CommunityAndSocialCatalog {
                         Report.TargetType.POST,
                         "ban-do-ca-phe-specialty-saigon",
                         "phanquocbao@gmail.com",
-                        "Đề xuất chuyển sang chuyên mục Đời sống",
-                        "Bài viết tập trung nhiều vào tiêu chí chọn bàn ghế, ổ điện và không gian ngồi làm việc cho dân văn phòng hơn là công thức ẩm thực thuần túy, nhờ ban điều hành xem xét phân loại chuyên mục phù hợp.",
+                        "Nghi ngờ nội dung quảng cáo thương mại chưa gắn nhãn",
+                        "Người dùng phản ánh bài viết giới thiệu chi tiết các quán cà phê kèm đường dẫn địa điểm thương mại nhưng chưa có ghi chú minh bạch tài trợ.",
                         Report.ReportStatus.PENDING,
                         null,
                         5
@@ -561,8 +611,8 @@ public final class CommunityAndSocialCatalog {
                         Report.TargetType.COMMENT,
                         "van-hoa-pho-ha-noi-buoi-som",
                         "lehongnhung@gmail.com",
-                        "Nhận xét quy chụp thiếu khách quan",
-                        "Bình luận đánh đồng không gian các quán phở truyền thống khu phố cổ chưa sạch dễ gây ảnh hưởng không tốt tới những cơ sở lâu năm đã cải tạo khang trang.",
+                        "Bình luận quy chụp gây tranh cãi vùng miền",
+                        "Bình luận có ngôn từ khái quát tiêu cực về vệ sinh chung tại khu vực phố cổ, có nguy cơ gây tranh cãi không cần thiết giữa người đọc.",
                         Report.ReportStatus.PENDING,
                         null,
                         9
@@ -571,8 +621,8 @@ public final class CommunityAndSocialCatalog {
                         Report.TargetType.POST,
                         "jwt-security-rate-limiting",
                         "vuquoctuan@gmail.com",
-                        "Cần bổ sung lưu ý cấu hình Reverse Proxy",
-                        "Đề xuất tác giả ghi chú rõ hơn việc chỉ tin cậy header X-Forwarded-For từ dải IP nội bộ để người mới đọc không cấu hình sơ hở trên máy chủ thực tế.",
+                        "Chia sẻ đoạn mã có nguy cơ lạm dụng vượt Rate Limit",
+                        "Người dùng báo cáo phần mô tả kỹ thuật cấu hình proxy và header giả mạo IP cần rà soát để tránh hướng dẫn cách lách bộ giới hạn tần suất API.",
                         Report.ReportStatus.PENDING,
                         null,
                         14
