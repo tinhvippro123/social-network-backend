@@ -10,6 +10,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,5 +57,31 @@ class AdminServiceTest {
         assertThrows(BusinessRuleException.class, () -> service.users(null, "", 0, 20));
         assertThrows(BusinessRuleException.class, () -> service.posts(null, "", 1, 101));
         verifyNoInteractions(users, posts);
+    }
+
+    @Test
+    void statsBucketsRangeWithTwoTimestampQueriesInsteadOfPerBucketCounts() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDateTime todayNoon = today.atTime(12, 0);
+        LocalDateTime twoDaysAgo = today.minusDays(2).atTime(9, 30);
+
+        when(users.findJoinedAtBetween(any(), any())).thenReturn(List.of(todayNoon, twoDaysAgo));
+        when(posts.findCreatedAtBetween(any(), any())).thenReturn(List.of(todayNoon));
+        when(posts.countByCategory(any())).thenReturn(List.of());
+        when(posts.findTop5ByOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(users.findTop5ByOrderByJoinedAtDesc()).thenReturn(List.of());
+        when(reports.findTop5ByOrderByCreatedAtDesc()).thenReturn(List.of());
+
+        var result = service.stats(7);
+        assertEquals(7, result.growth().size());
+        assertEquals(1, result.newUsersToday());
+        assertEquals(1, result.newPostsToday());
+        assertEquals(2, result.newUsersInRange());
+        assertEquals(1, result.newPostsInRange());
+
+        verify(users, times(1)).findJoinedAtBetween(any(), any());
+        verify(posts, times(1)).findCreatedAtBetween(any(), any());
+        verify(users, never()).countByJoinedAtGreaterThanEqualAndJoinedAtLessThan(any(), any());
+        verify(posts, never()).countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(any(), any());
     }
 }

@@ -3,30 +3,33 @@ package com.vietblog.infrastructure.repository;
 import com.vietblog.domain.entity.Report;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface ReportRepository extends JpaRepository<Report, String> {
     @Override
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"reporter", "resolvedBy"})
+    @EntityGraph(attributePaths = {"reporter", "resolvedBy"})
     Page<Report> findAll(Pageable pageable);
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"reporter", "resolvedBy"})
+    @EntityGraph(attributePaths = {"reporter", "resolvedBy"})
     Page<Report> findByStatus(Report.ReportStatus status, Pageable pageable);
     long countByStatus(Report.ReportStatus status);
     List<Report> findTop5ByOrderByCreatedAtDesc();
     boolean existsByReporterIdAndTargetIdAndTypeAndStatus(String reporterId, String targetId,
                                                         Report.TargetType type, Report.ReportStatus status);
+    @EntityGraph(attributePaths = {"reporter"})
     List<Report> findByTypeAndTargetIdAndStatus(Report.TargetType type, String targetId, Report.ReportStatus status);
     long countByTypeAndTargetIdAndStatus(Report.TargetType type, String targetId, Report.ReportStatus status);
 
     @Query("SELECT r.targetId, COUNT(r) FROM Report r WHERE r.type = :type AND r.targetId IN :targetIds GROUP BY r.targetId")
-    List<Object[]> countByTargetIds(@Param("type") Report.TargetType type, @Param("targetIds") java.util.Collection<String> targetIds);
+    List<Object[]> countByTargetIds(@Param("type") Report.TargetType type, @Param("targetIds") Collection<String> targetIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Report r where r.id = :id")

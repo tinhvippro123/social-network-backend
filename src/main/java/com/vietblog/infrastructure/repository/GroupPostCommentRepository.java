@@ -1,13 +1,16 @@
 package com.vietblog.infrastructure.repository;
 
 import com.vietblog.domain.entity.GroupPostComment;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.Collection;
 import java.util.List;
 
 public interface GroupPostCommentRepository extends JpaRepository<GroupPostComment, String> {
+    @EntityGraph(attributePaths = {"author", "post"})
     List<GroupPostComment> findByPostIdOrderByCreatedAtAsc(String postId);
     long countByPostId(String postId);
     void deleteByPostId(String postId);
@@ -17,5 +20,5 @@ public interface GroupPostCommentRepository extends JpaRepository<GroupPostComme
     void deleteByGroupId(@Param("groupId") String groupId);
 
     @Query("select c.post.id, count(c) from GroupPostComment c where c.post.id in :postIds group by c.post.id")
-    List<Object[]> countByPostIds(@Param("postIds") java.util.Collection<String> postIds);
+    List<Object[]> countByPostIds(@Param("postIds") Collection<String> postIds);
 }

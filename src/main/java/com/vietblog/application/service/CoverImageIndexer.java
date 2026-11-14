@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -78,12 +77,7 @@ public class CoverImageIndexer {
     @EventListener(ApplicationReadyEvent.class)
     public void indexMissingOnStartup() {
         worker.submit(() -> {
-            List<String> pending = tx.execute(status -> posts.findByStatus(Post.PostStatus.PUBLISHED, Pageable.unpaged())
-                    .stream()
-                    .filter(post -> post.getCoverImage() != null && !post.getCoverImage().isBlank())
-                    .map(Post::getId)
-                    .filter(id -> !index.existsById(id))
-                    .toList());
+            List<String> pending = tx.execute(status -> posts.findPublishedIdsWithUnindexedCoverImage());
             if (pending == null || pending.isEmpty()) return;
             int indexed = 0;
             for (String id : pending) if (indexNow(id)) indexed++;

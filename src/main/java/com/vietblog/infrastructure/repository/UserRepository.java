@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,7 +17,7 @@ public interface UserRepository extends JpaRepository<User, String> {
     boolean isFollowing(@Param("targetUserId") String targetUserId, @Param("currentUserId") String currentUserId);
 
     @Query("SELECT u.id FROM User u JOIN u.followers f WHERE f.id = :currentUserId AND u.id IN :targetUserIds")
-    List<String> findFollowedUserIds(@Param("currentUserId") String currentUserId, @Param("targetUserIds") java.util.Collection<String> targetUserIds);
+    List<String> findFollowedUserIds(@Param("currentUserId") String currentUserId, @Param("targetUserIds") Collection<String> targetUserIds);
 
     @Query("SELECT f FROM User u JOIN u.followers f WHERE u.id = :userId")
     List<User> findFollowersByUserId(@Param("userId") String userId);
@@ -26,4 +27,13 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     @Query("SELECT u FROM User u WHERE u.isActive = true ORDER BY u.followersCount DESC")
     List<User> findTopUsers(Pageable pageable);
+
+    @Query("SELECT u.id FROM User u WHERE u.isActive = true AND u.id IN :ids")
+    List<String> findActiveUserIds(@Param("ids") Collection<String> ids);
+
+    @Query(value = "SELECT user_id, COUNT(*) FROM user_followers GROUP BY user_id", nativeQuery = true)
+    List<Object[]> countFollowersGroupByUserId();
+
+    @Query(value = "SELECT follower_id, COUNT(*) FROM user_followers GROUP BY follower_id", nativeQuery = true)
+    List<Object[]> countFollowingGroupByFollowerId();
 }

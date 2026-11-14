@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import java.util.Collection;
 import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, String> {
@@ -15,6 +16,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Stri
     Page<Notification> findByUserId(String userId, Pageable pageable);
     Page<Notification> findByUserIdAndIsReadFalse(String userId, Pageable pageable);
     boolean existsByUserIdAndTypeAndLink(String userId, Notification.NotificationType type, String link);
+
+    @Query("select n.user.id, n.link from Notification n where n.type = :type and n.link in :links")
+    List<Object[]> findUserIdsAndLinksByTypeAndLinkIn(
+            @Param("type") Notification.NotificationType type,
+            @Param("links") Collection<String> links);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Notification n set n.isRead = true where n.id = :id and n.user.id = :userId")

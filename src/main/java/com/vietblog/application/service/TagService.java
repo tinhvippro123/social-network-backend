@@ -1,11 +1,13 @@
 package com.vietblog.application.service;
 
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.infrastructure.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -17,7 +19,7 @@ public class TagService {
     private PostApplicationService postApplicationService;
     public record TagResponse(String name, long postsCount) { }
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     void setPostApplicationService(PostApplicationService postApplicationService) {
         this.postApplicationService = postApplicationService;
     }
@@ -32,8 +34,8 @@ public class TagService {
             var updated = post.getTags().stream().map(tag -> tag.equals(name) ? replacement.trim() : tag).distinct().toList();
             post.getTags().clear();
             post.getTags().addAll(updated);
-            refresh(post);
         }
+        refreshAll(posts);
         return posts.size();
     }
 
@@ -41,15 +43,15 @@ public class TagService {
     @Transactional
     public int delete(String name) {
         var posts = tags.findTagged(name);
-        posts.forEach(post -> {
-            post.getTags().removeIf(name::equals);
-            refresh(post);
-        });
+        posts.forEach(post -> post.getTags().removeIf(name::equals));
+        refreshAll(posts);
         return posts.size();
     }
 
-    private void refresh(com.vietblog.domain.entity.Post post) {
-        if (postApplicationService != null) postApplicationService.refreshSearchIndexAndCaches(post);
+    private void refreshAll(List<Post> posts) {
+        if (postApplicationService != null && !posts.isEmpty()) {
+            postApplicationService.refreshSearchIndexAndCaches(posts);
+        }
     }
 
     @Transactional(readOnly = true)

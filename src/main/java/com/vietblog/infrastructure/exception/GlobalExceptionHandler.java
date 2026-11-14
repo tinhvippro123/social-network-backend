@@ -3,7 +3,6 @@ package com.vietblog.infrastructure.exception;
 import com.vietblog.application.dto.ApiResponse;
 import com.vietblog.domain.exception.BusinessRuleException;
 import com.vietblog.domain.exception.DomainException;
-import com.vietblog.domain.exception.ErrorCode;
 import com.vietblog.domain.exception.ForbiddenException;
 import com.vietblog.domain.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;

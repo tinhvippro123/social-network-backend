@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface AdminUserRepository extends JpaRepository<User, String> {
@@ -24,5 +25,8 @@ public interface AdminUserRepository extends JpaRepository<User, String> {
 
     long countByJoinedAtGreaterThanEqualAndJoinedAtLessThan(LocalDateTime from, LocalDateTime to);
 
-    java.util.List<User> findTop5ByOrderByJoinedAtDesc();
+    @Query("select u.joinedAt from User u where u.joinedAt >= :from and u.joinedAt < :to")
+    List<LocalDateTime> findJoinedAtBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    List<User> findTop5ByOrderByJoinedAtDesc();
 }

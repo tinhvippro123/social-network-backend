@@ -9,6 +9,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.function.Predicate;
 
 @Service @RequiredArgsConstructor @Transactional
 public class ChatService {
@@ -28,15 +30,15 @@ public class ChatService {
     private final ApplicationEventPublisher events;
     @PersistenceContext private EntityManager entityManager;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private SystemSettingsService systemSettingsService;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private EmailService emailService;
 
-    private java.util.function.Predicate<String> onlineChecker = id -> false;
+    private Predicate<String> onlineChecker = id -> false;
 
-    public void setOnlineChecker(java.util.function.Predicate<String> onlineChecker) {
+    public void setOnlineChecker(Predicate<String> onlineChecker) {
         this.onlineChecker = onlineChecker != null ? onlineChecker : id -> false;
     }
 
@@ -89,11 +91,19 @@ public class ChatService {
 
     public ConversationResponse create(String userId, ConversationRequest request) {
         requireChatEnabled();
-        User creator = user(userId);
         Set<String> ids = new TreeSet<>(request.participantIds());
         ids.add(userId);
         if (ids.size() < 2 || ids.size() > 50 || (!request.isGroup() && ids.size() != 2)) invalid();
-        List<User> participants = ids.stream().map(this::user).toList();
+        Map<String, User> userById = new HashMap<>();
+        users.findAllById(ids).forEach(u -> userById.put(u.getId(), u));
+        List<User> participants = new ArrayList<>(ids.size());
+        for (String id : ids) {
+            User participant = userById.get(id);
+            if (participant == null) throw new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND);
+            if (!participant.isActive()) forbidden();
+            participants.add(participant);
+        }
+        User creator = userById.get(userId);
         String resolvedName = request.name();
         if (request.isGroup() && (resolvedName == null || resolvedName.isBlank())) {
             String joinedNames = participants.stream().map(User::getName).reduce((a, b) -> a + ", " + b).orElse("Nhóm chat");
@@ -115,11 +125,21 @@ public class ChatService {
         }
         Conversation conversation = conversations.save(Conversation.builder().creator(creator).name(resolvedName)
                 .groupChat(request.isGroup()).directKey(directKey).build());
-        for (User participant : participants) members.save(ConversationMember.builder().conversation(conversation).user(participant).build());
-        for (ConversationMember recipient : members.findByConversationId(conversation.getId())) {
-            events.publishEvent(new ChatEvent("conversation.created", conversation.getId(), recipient.getUser().getId(), conversation(conversation, recipient)));
+        List<ConversationMember> savedMembers = members.saveAll(participants.stream()
+                .map(participant -> ConversationMember.builder().conversation(conversation).user(participant).build())
+                .toList());
+        ConversationMember creatorMember = savedMembers.stream()
+                .filter(m -> m.getUser().getId().equals(userId))
+                .findFirst()
+                .orElseThrow(() -> new ForbiddenException(ErrorCode.FORBIDDEN));
+        for (ConversationMember recipient : savedMembers) {
+            events.publishEvent(new ChatEvent(
+                    "conversation.created",
+                    conversation.getId(),
+                    recipient.getUser().getId(),
+                    buildConversationResponse(conversation, recipient, savedMembers, null, 0L)));
         }
-        return conversation(conversation, member(conversation.getId(), userId));
+        return buildConversationResponse(conversation, creatorMember, savedMembers, null, 0L);
     }
 
     @Transactional(readOnly = true)
@@ -272,8 +292,7 @@ public class ChatService {
 
     @Transactional(readOnly = true)
     public boolean canReceive(String conversationId, String userId) {
-        return users.findById(userId).map(User::isActive).orElse(false)
-                && members.existsByConversationIdAndUserId(conversationId, userId);
+        return members.existsActiveMember(conversationId, userId);
     }
 
     private ConversationResponse conversation(Conversation conversation, ConversationMember viewer) {

@@ -11,6 +11,11 @@ import java.util.*;
 public interface ConversationMemberRepository extends JpaRepository<ConversationMember, String> {
     Optional<ConversationMember> findByConversationIdAndUserId(String conversationId, String userId);
     boolean existsByConversationIdAndUserId(String conversationId, String userId);
+
+    @Query("select case when count(m) > 0 then true else false end from ConversationMember m where m.conversation.id = :conversationId and m.user.id = :userId and m.user.isActive = true")
+    boolean existsActiveMember(@Param("conversationId") String conversationId, @Param("userId") String userId);
+
+    @EntityGraph(attributePaths = {"user"})
     List<ConversationMember> findByConversationId(String conversationId);
 
     @EntityGraph(attributePaths = {"user", "conversation"})

@@ -27,9 +27,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -58,19 +65,51 @@ public class AdminService {
         int buckets = (int) Math.ceil(range / (double) bucket);
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
 
-        var growth = new ArrayList<AdminDtos.DailyGrowth>();
-        for (int i = buckets - 1; i >= 0; i--) {
-            LocalDate end = today.minusDays((long) i * bucket).plusDays(1);
-            LocalDate start = end.minusDays(bucket);
-            growth.add(new AdminDtos.DailyGrowth(start,
-                    users.countByJoinedAtGreaterThanEqualAndJoinedAtLessThan(start.atStartOfDay(), end.atStartOfDay()),
-                    posts.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(start.atStartOfDay(), end.atStartOfDay())));
+        LocalDate earliest = today.plusDays(1).minusDays((long) buckets * bucket);
+        LocalDateTime rangeStart = earliest.atStartOfDay();
+        LocalDateTime rangeEnd = today.plusDays(1).atStartOfDay();
+
+        long[] userBucketCounts = new long[buckets];
+        long[] postBucketCounts = new long[buckets];
+        long newUsersToday = 0;
+        long newPostsToday = 0;
+
+        List<LocalDateTime> userTimestamps = users.findJoinedAtBetween(rangeStart, rangeEnd);
+        if (userTimestamps != null) {
+            for (LocalDateTime ts : userTimestamps) {
+                if (ts == null) continue;
+                LocalDate date = ts.toLocalDate();
+                long offsetDays = ChronoUnit.DAYS.between(earliest, date);
+                if (offsetDays >= 0 && offsetDays < (long) buckets * bucket) {
+                    userBucketCounts[(int) (offsetDays / bucket)]++;
+                }
+                if (date.equals(today)) {
+                    newUsersToday++;
+                }
+            }
         }
 
-        var dayStart = today.atStartOfDay();
-        var dayEnd = today.plusDays(1).atStartOfDay();
-        long newUsersToday = users.countByJoinedAtGreaterThanEqualAndJoinedAtLessThan(dayStart, dayEnd);
-        long newPostsToday = posts.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(dayStart, dayEnd);
+        List<LocalDateTime> postTimestamps = posts.findCreatedAtBetween(rangeStart, rangeEnd);
+        if (postTimestamps != null) {
+            for (LocalDateTime ts : postTimestamps) {
+                if (ts == null) continue;
+                LocalDate date = ts.toLocalDate();
+                long offsetDays = ChronoUnit.DAYS.between(earliest, date);
+                if (offsetDays >= 0 && offsetDays < (long) buckets * bucket) {
+                    postBucketCounts[(int) (offsetDays / bucket)]++;
+                }
+                if (date.equals(today)) {
+                    newPostsToday++;
+                }
+            }
+        }
+
+        var growth = new ArrayList<AdminDtos.DailyGrowth>(buckets);
+        for (int i = buckets - 1, idx = 0; i >= 0; i--, idx++) {
+            LocalDate start = today.minusDays((long) i * bucket).plusDays(1).minusDays(bucket);
+            growth.add(new AdminDtos.DailyGrowth(start, userBucketCounts[idx], postBucketCounts[idx]));
+        }
+
         long usersInRange = growth.stream().mapToLong(AdminDtos.DailyGrowth::users).sum();
         long postsInRange = growth.stream().mapToLong(AdminDtos.DailyGrowth::posts).sum();
 
@@ -99,7 +138,7 @@ public class AdminService {
                 "Báo cáo mới: " + r.getReason() + (r.getTargetTitle() != null ? " — \"" + r.getTargetTitle() + "\"" : ""),
                 r.getCreatedAt())));
         list.removeIf(a -> a.time() == null);
-        list.sort(java.util.Comparator.comparing(AdminDtos.Activity::time).reversed());
+        list.sort(Comparator.comparing(AdminDtos.Activity::time).reversed());
         return list.stream().limit(8).toList();
     }
 
@@ -139,7 +178,9 @@ public class AdminService {
             throw new BusinessRuleException(ErrorCode.PROTECTED_ADMIN_ACCOUNT);
         }
         user.setRole(role);
-        return toUserResponse(users.save(user));
+        User saved = users.save(user);
+        User.CacheInvalidationListener.notifyChanged(saved.getId());
+        return toUserResponse(saved);
     }
 
     @Transactional
@@ -149,7 +190,9 @@ public class AdminService {
             throw new BusinessRuleException(ErrorCode.PROTECTED_ADMIN_ACCOUNT);
         }
         user.setActive(!banned);
-        return toUserResponse(users.save(user));
+        User saved = users.save(user);
+        User.CacheInvalidationListener.notifyChanged(saved.getId());
+        return toUserResponse(saved);
     }
 
     @Transactional
@@ -179,22 +222,31 @@ public class AdminService {
         if (id.equals(actorId) || user.getRole() == User.Role.ADMIN) {
             throw new BusinessRuleException(ErrorCode.PROTECTED_ADMIN_ACCOUNT);
         }
-        User actor = users.findById(actorId).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
-        // 1. Clear followers / following join table & sync peer counters
-        for (User follower : new ArrayList<>(user.getFollowers())) {
-            follower.getFollowing().remove(user);
-            follower.setFollowingCount(Math.max(0, follower.getFollowingCount() - 1));
-            users.save(follower);
+        // 1. Clear followers / following join table & sync peer counters in bulk
+        em.flush();
+        @SuppressWarnings("unchecked")
+        List<String> followerIds = em.createNativeQuery("SELECT follower_id FROM user_followers WHERE user_id = :uid")
+                .setParameter("uid", id).getResultList();
+        @SuppressWarnings("unchecked")
+        List<String> followedIds = em.createNativeQuery("SELECT user_id FROM user_followers WHERE follower_id = :uid")
+                .setParameter("uid", id).getResultList();
+        if (!followerIds.isEmpty() || !followedIds.isEmpty()) {
+            em.createNativeQuery("DELETE FROM user_followers WHERE user_id = :uid OR follower_id = :uid")
+                    .setParameter("uid", id).executeUpdate();
         }
-        for (User followed : new ArrayList<>(user.getFollowing())) {
-            followed.getFollowers().remove(user);
-            followed.setFollowersCount(Math.max(0, followed.getFollowersCount() - 1));
-            users.save(followed);
+        for (int i = 0; i < followerIds.size(); i += 500) {
+            List<String> chunk = followerIds.subList(i, Math.min(followerIds.size(), i + 500));
+            em.createQuery("UPDATE User u SET u.followingCount = CASE WHEN u.followingCount > 0 THEN u.followingCount - 1 ELSE 0 END WHERE u.id IN :ids")
+                    .setParameter("ids", chunk).executeUpdate();
         }
-        user.getFollowers().clear();
-        user.getFollowing().clear();
-        users.saveAndFlush(user);
+        for (int i = 0; i < followedIds.size(); i += 500) {
+            List<String> chunk = followedIds.subList(i, Math.min(followedIds.size(), i + 500));
+            em.createQuery("UPDATE User u SET u.followersCount = CASE WHEN u.followersCount > 0 THEN u.followersCount - 1 ELSE 0 END WHERE u.id IN :ids")
+                    .setParameter("ids", chunk).executeUpdate();
+        }
+
+        User actor = users.findById(actorId).orElseThrow(() -> new ResourceNotFoundException(ErrorCode.USER_NOT_FOUND));
 
         // 2. Delete tokens, blocks, notifications, reports
         em.createQuery("DELETE FROM PasswordResetToken t WHERE t.user.id = :uid").setParameter("uid", id).executeUpdate();
@@ -218,19 +270,23 @@ public class AdminService {
 
         List<Group> ownedGroups = em.createQuery("SELECT g FROM CommunityGroup g WHERE g.owner.id = :uid", Group.class)
                 .setParameter("uid", id).getResultList();
-        for (Group g : ownedGroups) {
-            g.setOwner(actor);
-            Long existingMembership = em.createQuery(
-                    "SELECT COUNT(gm) FROM GroupMember gm WHERE gm.group.id = :gid AND gm.user.id = :aid", Long.class)
-                    .setParameter("gid", g.getId()).setParameter("aid", actorId).getSingleResult();
-            if (existingMembership == null || existingMembership == 0) {
-                em.persist(GroupMember.builder().group(g).user(actor).role(GroupMember.Role.OWNER).build());
-            } else {
-                em.createQuery("UPDATE GroupMember gm SET gm.role = :role WHERE gm.group.id = :gid AND gm.user.id = :aid")
+        if (!ownedGroups.isEmpty()) {
+            List<String> ownedGroupIds = ownedGroups.stream().map(Group::getId).toList();
+            Set<String> actorGroupIds = new HashSet<>(em.createQuery(
+                    "SELECT gm.group.id FROM GroupMember gm WHERE gm.group.id IN :gids AND gm.user.id = :aid", String.class)
+                    .setParameter("gids", ownedGroupIds).setParameter("aid", actorId).getResultList());
+            if (!actorGroupIds.isEmpty()) {
+                em.createQuery("UPDATE GroupMember gm SET gm.role = :role WHERE gm.group.id IN :gids AND gm.user.id = :aid")
                         .setParameter("role", GroupMember.Role.OWNER)
-                        .setParameter("gid", g.getId())
+                        .setParameter("gids", actorGroupIds)
                         .setParameter("aid", actorId)
                         .executeUpdate();
+            }
+            for (Group g : ownedGroups) {
+                g.setOwner(actor);
+                if (!actorGroupIds.contains(g.getId())) {
+                    em.persist(GroupMember.builder().group(g).user(actor).role(GroupMember.Role.OWNER).build());
+                }
             }
         }
 
@@ -241,12 +297,12 @@ public class AdminService {
         affectedPostIds.addAll(em.createQuery("SELECT DISTINCT c.post.id FROM Comment c WHERE c.author.id = :uid", String.class)
                 .setParameter("uid", id).getResultList());
 
-        List<String> upvotedPostIds = em.createQuery(
+        Set<String> upvotedPostIds = new HashSet<>(em.createQuery(
                 "SELECT r.post.id FROM Reaction r WHERE r.user.id = :uid AND r.emoji = 'UPVOTE'", String.class)
-                .setParameter("uid", id).getResultList();
-        List<String> downvotedPostIds = em.createQuery(
+                .setParameter("uid", id).getResultList());
+        Set<String> downvotedPostIds = new HashSet<>(em.createQuery(
                 "SELECT r.post.id FROM Reaction r WHERE r.user.id = :uid AND r.emoji = 'DOWNVOTE'", String.class)
-                .setParameter("uid", id).getResultList();
+                .setParameter("uid", id).getResultList());
 
         em.createQuery("DELETE FROM Reaction r WHERE r.user.id = :uid").setParameter("uid", id).executeUpdate();
         em.createQuery("DELETE FROM Bookmark b WHERE b.user.id = :uid").setParameter("uid", id).executeUpdate();
@@ -259,28 +315,38 @@ public class AdminService {
             postApplicationService.deletePost(postId, actorId);
         }
 
-        for (String pid : affectedPostIds.stream().distinct().toList()) {
-            if (!authoredPostIds.contains(pid)) {
-                posts.findById(pid).ifPresent(p -> {
-                    long commentCount = comments.countByPostId(pid);
-                    p.setCommentsCount(Math.toIntExact(commentCount));
-                    if (upvotedPostIds.contains(pid)) {
-                        p.setUpvotesCount(Math.max(0, p.getUpvotesCount() - 1));
-                    }
-                    if (downvotedPostIds.contains(pid)) {
-                        p.setDownvotesCount(Math.max(0, p.getDownvotesCount() - 1));
-                    }
-                    if (postDomainService != null) {
-                        postDomainService.calculateTrendingScore(p);
-                    }
-                    posts.save(p);
-                    postApplicationService.refreshSearchIndexAndCaches(p);
-                });
+        Set<String> remainingPostIds = new HashSet<>(affectedPostIds);
+        authoredPostIds.forEach(remainingPostIds::remove);
+        if (!remainingPostIds.isEmpty()) {
+            List<String> postIdList = new ArrayList<>(remainingPostIds);
+            Map<String, Long> commentCounts = new HashMap<>();
+            for (int i = 0; i < postIdList.size(); i += 500) {
+                List<String> chunk = postIdList.subList(i, Math.min(postIdList.size(), i + 500));
+                for (Object[] row : comments.countByPostIds(chunk)) {
+                    commentCounts.put((String) row[0], ((Number) row[1]).longValue());
+                }
             }
+            List<Post> affectedPosts = posts.findAllById(postIdList);
+            for (Post p : affectedPosts) {
+                long commentCount = commentCounts.getOrDefault(p.getId(), 0L);
+                p.setCommentsCount(Math.toIntExact(commentCount));
+                if (upvotedPostIds.contains(p.getId())) {
+                    p.setUpvotesCount(Math.max(0, p.getUpvotesCount() - 1));
+                }
+                if (downvotedPostIds.contains(p.getId())) {
+                    p.setDownvotesCount(Math.max(0, p.getDownvotesCount() - 1));
+                }
+                if (postDomainService != null) {
+                    postDomainService.calculateTrendingScore(p);
+                }
+            }
+            posts.saveAll(affectedPosts);
+            postApplicationService.refreshSearchIndexAndCaches(affectedPosts);
         }
 
         em.flush();
         users.delete(user);
+        User.CacheInvalidationListener.notifyChanged(id);
     }
 
     public static PageRequest page(int page, int limit, String sort) {

@@ -10,7 +10,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, String> {
+    @EntityGraph(attributePaths = {"sender", "replyTo", "replyTo.sender"})
     Page<ChatMessage> findByConversationId(String conversationId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"sender", "replyTo", "replyTo.sender"})
     Page<ChatMessage> findByConversationIdAndRevokedFalseAndContentContainingIgnoreCase(String conversationId, String query, Pageable pageable);
     Optional<ChatMessage> findFirstByConversationIdOrderByCreatedAtDescIdDesc(String conversationId);
 

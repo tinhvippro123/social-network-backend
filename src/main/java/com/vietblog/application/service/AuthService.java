@@ -12,6 +12,7 @@ import com.vietblog.infrastructure.repository.UserRepository;
 import com.vietblog.infrastructure.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -29,6 +30,8 @@ import java.net.http.HttpResponse;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,7 +55,7 @@ public class AuthService {
 
     private record IssuedOtpToken(String token, String otp, LocalDateTime expiryDate) {}
 
-    @org.springframework.beans.factory.annotation.Value("${google.client-id:}")
+    @Value("${google.client-id:}")
     private String googleClientId;
 
     @Transactional
@@ -226,11 +229,15 @@ public class AuthService {
     }
 
     private IssuedOtpToken issueOtpToken(User user, PasswordResetToken.TokenPurpose purpose) {
+        List<PasswordResetToken> toRevoke = new ArrayList<>();
         for (PasswordResetToken existing : resetTokenRepository.findByUserAndUsedFalse(user)) {
             if (existing.effectivePurpose() == purpose) {
                 existing.setUsed(true);
-                resetTokenRepository.save(existing);
+                toRevoke.add(existing);
             }
+        }
+        if (!toRevoke.isEmpty()) {
+            resetTokenRepository.saveAll(toRevoke);
         }
 
         String resetToken = UUID.randomUUID().toString();

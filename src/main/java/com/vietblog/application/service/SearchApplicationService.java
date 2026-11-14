@@ -17,6 +17,7 @@ import com.vietblog.infrastructure.repository.PostImageFeaturesRepository;
 import com.vietblog.infrastructure.repository.SearchCommentRepository;
 import com.vietblog.infrastructure.repository.SearchPostRepository;
 import com.vietblog.infrastructure.search.SearchFileReader;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -92,13 +93,39 @@ public class SearchApplicationService {
     }
 
     public static String searchableText(Post post) {
-        String tags = post.getTags() == null ? "" : String.join(" ", post.getTags());
+        return searchableText(post, post == null ? null : post.getTags());
+    }
+
+    private static String searchableText(Post post, List<String> tagList) {
+        String tags = tagList == null || tagList.isEmpty() ? "" : String.join(" ", tagList);
         String locationAddress = Objects.toString(post.getLocationAddress(), "");
         String value = post.getTitle() + " " + post.getTitle() + " "
                 + Objects.toString(post.getExcerpt(), "") + " "
                 + Objects.toString(post.getContent(), "") + " "
                 + tags + " " + locationAddress;
         return value.substring(0, Math.min(value.length(), 20_000));
+    }
+
+    private Map<String, List<String>> loadTagsByPostId(List<Post> corpus) {
+        List<String> postIds = corpus.stream()
+                .map(Post::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<String>> result = new HashMap<>();
+        for (int i = 0; i < postIds.size(); i += 500) {
+            List<String> chunk = postIds.subList(i, Math.min(postIds.size(), i + 500));
+            List<Object[]> rows = posts.findTagsByPostIds(chunk);
+            if (rows == null) continue;
+            for (Object[] row : rows) {
+                if (row == null || row.length < 2 || row[0] == null || row[1] == null) continue;
+                result.computeIfAbsent((String) row[0], ignored -> new ArrayList<>()).add((String) row[1]);
+            }
+        }
+        return result;
     }
 
     public List<PostResponse> search(String query, String type, int limit) {
@@ -125,8 +152,17 @@ public class SearchApplicationService {
         boolean widenForUnaccented = allUnaccented || hasUnaccentedToken;
         List<Post> corpus = "semantic".equals(type) ? semanticCorpus(query, limit, widenForUnaccented) : corpus();
         if (corpus.isEmpty()) return List.of();
+        Map<String, List<String>> tagsByPostId = loadTagsByPostId(corpus);
         double[] scores;
-        List<String> texts = corpus.stream().map(SearchApplicationService::searchableText).toList();
+        List<String> texts = corpus.stream()
+                .map(post -> {
+                    List<String> tags = tagsByPostId.get(post.getId());
+                    if (tags == null && Hibernate.isInitialized(post.getTags())) {
+                        tags = post.getTags();
+                    }
+                    return searchableText(post, tags);
+                })
+                .toList();
         if ("semantic".equals(type)) {
             if (allUnaccented) {
                 scores = TextAlgorithms.similarities(texts.stream().map(TextAlgorithms::foldedContent).toList(), TextAlgorithms.foldedContent(query));

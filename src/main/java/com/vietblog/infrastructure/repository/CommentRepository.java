@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.Modifying;
 import com.vietblog.domain.entity.Comment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Collection;
 import java.util.List;
 
 public interface CommentRepository extends JpaRepository<Comment, String> {
@@ -21,5 +22,11 @@ public interface CommentRepository extends JpaRepository<Comment, String> {
     List<Comment> findAllByPostIdWithAuthor(@Param("postId") String postId);
 
     @Query("select c.id, c.post.id from Comment c where c.id in :ids")
-    List<Object[]> findPostIdsByCommentIds(@Param("ids") java.util.Collection<String> ids);
+    List<Object[]> findPostIdsByCommentIds(@Param("ids") Collection<String> ids);
+
+    @Query("select c.post.id, count(c) from Comment c where c.post.id in :postIds group by c.post.id")
+    List<Object[]> countByPostIds(@Param("postIds") Collection<String> postIds);
+
+    @Query("select c.post.id, count(c) from Comment c group by c.post.id")
+    List<Object[]> countAllGroupByPostId();
 }

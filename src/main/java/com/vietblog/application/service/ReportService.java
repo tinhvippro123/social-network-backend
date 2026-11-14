@@ -21,12 +21,16 @@ import com.vietblog.infrastructure.repository.NotificationRepository;
 import com.vietblog.infrastructure.repository.ReportRepository;
 import com.vietblog.domain.service.PostDomainService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -44,12 +48,12 @@ public class ReportService {
     private PostApplicationService postApplicationService;
     private SystemSettingsService systemSettingsService;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     void setPostApplicationService(PostApplicationService postApplicationService) {
         this.postApplicationService = postApplicationService;
     }
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     void setSystemSettingsService(SystemSettingsService systemSettingsService) {
         this.systemSettingsService = systemSettingsService;
     }
@@ -110,7 +114,7 @@ public class ReportService {
                 .distinct()
                 .toList();
         var commentPostIds = commentIds.isEmpty()
-                ? java.util.Map.<String, String>of()
+                ? Map.<String, String>of()
                 : BatchLookup.toStringMap(comments.findPostIdsByCommentIds(commentIds));
 
         return reportPage.map(report -> {
@@ -135,10 +139,28 @@ public class ReportService {
         }
         ReportDtos.Response res = finish(report, actor, Report.ReportStatus.RESOLVED, action.name());
         if (action == ReportDtos.Action.DELETE || action == ReportDtos.Action.BAN) {
-            for (Report dup : reports.findByTypeAndTargetIdAndStatus(report.getType(), report.getTargetId(), Report.ReportStatus.PENDING)) {
-                if (!dup.getId().equals(report.getId())) {
-                    finish(dup, actor, Report.ReportStatus.RESOLVED, action.name());
+            List<Report> duplicates = reports.findByTypeAndTargetIdAndStatus(
+                    report.getType(), report.getTargetId(), Report.ReportStatus.PENDING)
+                    .stream()
+                    .filter(dup -> !dup.getId().equals(report.getId()))
+                    .toList();
+            if (!duplicates.isEmpty()) {
+                LocalDateTime resolvedAt = LocalDateTime.now();
+                List<Notification> dupNotifications = new ArrayList<>(duplicates.size());
+                for (Report dup : duplicates) {
+                    dup.setStatus(Report.ReportStatus.RESOLVED);
+                    dup.setResolutionAction(action.name());
+                    dup.setResolvedBy(actor);
+                    dup.setResolvedAt(resolvedAt);
+                    dupNotifications.add(Notification.builder()
+                            .user(dup.getReporter())
+                            .type(Notification.NotificationType.REPORT)
+                            .message("Báo cáo của bạn đã được bộ phận kiểm duyệt xem xét: Đã xử lý")
+                            .link("/notifications")
+                            .build());
                 }
+                reports.saveAll(duplicates);
+                notifications.saveAll(dupNotifications);
             }
         }
         return res;
@@ -298,5 +320,6 @@ public class ReportService {
         }
         target.setActive(false);
         users.save(target);
+        User.CacheInvalidationListener.notifyChanged(target.getId());
     }
 }

@@ -846,8 +846,10 @@ public class ExtendedDataSeeder implements CommandLineRunner {
     }
 
     private void syncAllCounters() {
+        Map<String, Integer> commentCountsByPost = toIntCountMap(commentRepository.countAllGroupByPostId());
+        List<Post> dirtyPosts = new ArrayList<>();
         for (Post post : postRepository.findAll()) {
-            int commentCount = Math.toIntExact(commentRepository.countByPostId(post.getId()));
+            int commentCount = commentCountsByPost.getOrDefault(post.getId(), 0);
             boolean changed = false;
             if (post.getCommentsCount() != commentCount) {
                 post.setCommentsCount(commentCount);
@@ -855,29 +857,60 @@ public class ExtendedDataSeeder implements CommandLineRunner {
             }
             if (post.getTrendingScore() <= 0.0 || changed) {
                 postDomainService.calculateTrendingScore(post);
-                postRepository.save(post);
+                dirtyPosts.add(post);
             }
         }
-
-        for (User user : userRepository.findAll()) {
-            int postsCount = Math.toIntExact(postRepository.countByAuthorIdAndStatus(user.getId(), Post.PostStatus.PUBLISHED));
-            int followersCount = userRepository.findFollowersByUserId(user.getId()).size();
-            int followingCount = userRepository.findFollowingByUserId(user.getId()).size();
-            user.setPostsCount(postsCount);
-            user.setFollowersCount(followersCount);
-            user.setFollowingCount(followingCount);
-            userRepository.save(user);
+        if (!dirtyPosts.isEmpty()) {
+            postRepository.saveAll(dirtyPosts);
         }
 
+        Map<String, Integer> postsByAuthor = toIntCountMap(postRepository.countPublishedGroupByAuthorId());
+        Map<String, Integer> followersByUser = toIntCountMap(userRepository.countFollowersGroupByUserId());
+        Map<String, Integer> followingByUser = toIntCountMap(userRepository.countFollowingGroupByFollowerId());
+        List<User> dirtyUsers = new ArrayList<>();
+        for (User user : userRepository.findAll()) {
+            int postsCount = postsByAuthor.getOrDefault(user.getId(), 0);
+            int followersCount = followersByUser.getOrDefault(user.getId(), 0);
+            int followingCount = followingByUser.getOrDefault(user.getId(), 0);
+            if (user.getPostsCount() != postsCount
+                    || user.getFollowersCount() != followersCount
+                    || user.getFollowingCount() != followingCount) {
+                user.setPostsCount(postsCount);
+                user.setFollowersCount(followersCount);
+                user.setFollowingCount(followingCount);
+                dirtyUsers.add(user);
+            }
+        }
+        if (!dirtyUsers.isEmpty()) {
+            userRepository.saveAll(dirtyUsers);
+        }
+
+        Map<String, Integer> postsByCategory = toIntCountMap(postRepository.countPublishedGroupByCategoryId());
+        List<Category> dirtyCategories = new ArrayList<>();
         for (Category category : categoryRepository.findAll()) {
-            int catPosts = Math.toIntExact(postRepository.countByCategoryIdAndStatus(category.getId(), Post.PostStatus.PUBLISHED));
-            category.setPostsCount(catPosts);
-            categoryRepository.save(category);
+            int catPosts = postsByCategory.getOrDefault(category.getId(), 0);
+            if (category.getPostsCount() != catPosts) {
+                category.setPostsCount(catPosts);
+                dirtyCategories.add(category);
+            }
+        }
+        if (!dirtyCategories.isEmpty()) {
+            categoryRepository.saveAll(dirtyCategories);
         }
 
         postRepository.flush();
         userRepository.flush();
         categoryRepository.flush();
+    }
+
+    private static Map<String, Integer> toIntCountMap(List<Object[]> rows) {
+        Map<String, Integer> map = new HashMap<>();
+        if (rows == null) return map;
+        for (Object[] row : rows) {
+            if (row == null || row.length < 2 || row[0] == null || row[1] == null) continue;
+            map.put(String.valueOf(row[0]), ((Number) row[1]).intValue());
+        }
+        return map;
     }
 
     /**

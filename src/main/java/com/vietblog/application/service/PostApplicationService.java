@@ -23,6 +23,7 @@ import com.vietblog.infrastructure.repository.UserRepository;
 import com.vietblog.infrastructure.security.HtmlSanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -33,11 +34,14 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -416,6 +420,14 @@ public class PostApplicationService {
         evictPostAndCategoryCaches();
     }
 
+    public void refreshSearchIndexAndCaches(Collection<Post> posts) {
+        if (posts == null || posts.isEmpty()) return;
+        for (Post post : posts) {
+            syncPostSearchIndex(post);
+        }
+        evictPostAndCategoryCaches();
+    }
+
     private void syncPostSearchIndex(Post post) {
         if (post == null || post.getId() == null) return;
         if (post.getStatus() == Post.PostStatus.PUBLISHED) {
@@ -451,10 +463,10 @@ public class PostApplicationService {
         return plain.length() <= 200 ? plain : plain.substring(0, 197) + "...";
     }
 
-    private org.springframework.data.domain.Page<PostResponse> mapPostSummaryPage(
-            org.springframework.data.domain.Page<Post> page, String viewerId) {
+    private Page<PostResponse> mapPostSummaryPage(
+            Page<Post> page, String viewerId) {
         List<PostResponse> summaries = mapPostSummaries(page.getContent(), viewerId);
-        return new org.springframework.data.domain.PageImpl<>(summaries, page.getPageable(), page.getTotalElements());
+        return new PageImpl<>(summaries, page.getPageable(), page.getTotalElements());
     }
 
     private List<PostResponse> mapPostSummaries(List<Post> posts, String viewerId) {
@@ -463,8 +475,8 @@ public class PostApplicationService {
         }
         List<String> authorIds = posts.stream()
                 .map(Post::getAuthor)
-                .filter(java.util.Objects::nonNull)
-                .map(com.vietblog.domain.entity.User::getId)
+                .filter(Objects::nonNull)
+                .map(User::getId)
                 .distinct()
                 .toList();
         Map<String, Long> authorPostCounts = authorIds.isEmpty()
@@ -473,9 +485,9 @@ public class PostApplicationService {
                         postRepository.countByAuthorIdsAndStatus(authorIds, Post.PostStatus.PUBLISHED));
 
         List<String> postIds = posts.stream().map(Post::getId).toList();
-        java.util.Set<String> bookmarkedPostIds = (viewerId == null || postIds.isEmpty())
-                ? java.util.Set.of()
-                : new java.util.HashSet<>(bookmarks.findBookmarkedPostIds(viewerId, postIds));
+        Set<String> bookmarkedPostIds = (viewerId == null || postIds.isEmpty())
+                ? Set.of()
+                : new HashSet<>(bookmarks.findBookmarkedPostIds(viewerId, postIds));
 
         return posts.stream()
                 .map(post -> {

@@ -6,7 +6,6 @@ import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.application.dto.comment.CommentResponse;
 import com.vietblog.application.dto.comment.CreateCommentRequest;
 import com.vietblog.domain.entity.Comment;
-import com.vietblog.domain.entity.Notification;
 import com.vietblog.domain.entity.Post;
 import com.vietblog.domain.entity.User;
 import com.vietblog.domain.exception.BusinessRuleException;
@@ -21,7 +20,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -106,7 +108,7 @@ public class CommentApplicationService {
         // Chỉ lấy các comment bậc 1 (parent == null), 
         // bên trong CommentResponse.fromEntity sẽ đệ quy tự động map các replies
         List<Comment> allComments = commentRepository.findAllByPostIdWithAuthor(postId);
-        java.util.Map<String, List<Comment>> repliesByParentId = new java.util.HashMap<>();
+        Map<String, List<Comment>> repliesByParentId = new HashMap<>();
         List<Comment> topLevelComments = new ArrayList<>();
         for (Comment comment : allComments) {
             if (comment.getParent() == null) {
@@ -117,8 +119,8 @@ public class CommentApplicationService {
                         .add(comment);
             }
         }
-        topLevelComments.sort(java.util.Comparator
-                .comparing(Comment::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
+        topLevelComments.sort(Comparator
+                .comparing(Comment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
                 .reversed());
 
         return topLevelComments.stream()

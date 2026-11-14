@@ -20,6 +20,9 @@ public interface SearchPostRepository extends JpaRepository<Post, String> {
     @Query("select p from Post p where p.status = com.vietblog.domain.entity.Post.PostStatus.PUBLISHED and p.id in :ids")
     List<Post> findPublishedByIdIn(@Param("ids") Collection<String> ids);
 
+    @Query("select p.id, t from Post p join p.tags t where p.id in :postIds")
+    List<Object[]> findTagsByPostIds(@Param("postIds") Collection<String> postIds);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Post p where p.id = :id")
     Optional<Post> findLockedById(@Param("id") String id);

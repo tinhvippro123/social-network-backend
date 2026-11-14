@@ -4,10 +4,14 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 @Entity
 @Table(name = "users")
+@EntityListeners(User.CacheInvalidationListener.class)
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class User {
 
@@ -169,5 +173,35 @@ public class User {
     @Override
     public int hashCode() {
         return getClass().hashCode();
+    }
+
+    /**
+     * Notifies registered in-memory user caches immediately when a User entity is persisted,
+     * updated, or removed so bans and role changes take effect without waiting for TTL expiry.
+     */
+    public static class CacheInvalidationListener {
+        private static final List<Consumer<String>> LISTENERS =
+                new CopyOnWriteArrayList<>();
+
+        public static AutoCloseable register(Consumer<String> listener) {
+            LISTENERS.add(listener);
+            return () -> LISTENERS.remove(listener);
+        }
+
+        public static void notifyChanged(String userId) {
+            if (userId == null) return;
+            for (Consumer<String> listener : LISTENERS) {
+                listener.accept(userId);
+            }
+        }
+
+        @PostPersist
+        @PostUpdate
+        @PostRemove
+        public void onUserChanged(User user) {
+            if (user != null) {
+                notifyChanged(user.getId());
+            }
+        }
     }
 }
