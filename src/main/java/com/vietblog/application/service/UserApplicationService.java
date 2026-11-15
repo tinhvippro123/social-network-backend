@@ -24,7 +24,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -209,10 +212,10 @@ public class UserApplicationService {
             return List.of();
         }
         List<String> userIds = users.stream().map(User::getId).toList();
-        java.util.Set<String> followedIds = currentUserId == null
-                ? java.util.Set.of()
-                : new java.util.HashSet<>(userRepository.findFollowedUserIds(currentUserId, userIds));
-        java.util.Map<String, Long> postCounts = BatchLookup.toCountMap(
+        Set<String> followedIds = currentUserId == null
+                ? Set.of()
+                : new HashSet<>(userRepository.findFollowedUserIds(currentUserId, userIds));
+        Map<String, Long> postCounts = BatchLookup.toCountMap(
                 postRepository.countByAuthorIdsAndStatus(userIds, Post.PostStatus.PUBLISHED));
 
         return users.stream()
@@ -250,9 +253,9 @@ public class UserApplicationService {
         Page<Post> postPage = postRepository.findByAuthorIdAndStatus(targetUserId, postStatus, pageable);
         int authorPostsCount = (int) postRepository.countByAuthorIdAndStatus(targetUserId, Post.PostStatus.PUBLISHED);
         List<String> postIds = postPage.getContent().stream().map(Post::getId).toList();
-        java.util.Set<String> bookmarkedPostIds = (viewerId == null || postIds.isEmpty())
-                ? java.util.Set.of()
-                : new java.util.HashSet<>(bookmarkRepository.findBookmarkedPostIds(viewerId, postIds));
+        Set<String> bookmarkedPostIds = (viewerId == null || postIds.isEmpty())
+                ? Set.of()
+                : new HashSet<>(bookmarkRepository.findBookmarkedPostIds(viewerId, postIds));
 
         return postPage.map(post -> {
             boolean isBookmarked = bookmarkedPostIds.contains(post.getId());

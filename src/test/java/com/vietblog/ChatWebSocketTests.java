@@ -1,5 +1,7 @@
 package com.vietblog;
 
+import org.springframework.http.HttpHeaders;
+
 import com.vietblog.application.service.*;
 import com.vietblog.domain.entity.User;
 import com.vietblog.infrastructure.messaging.ChatWebSocketHandler;
@@ -60,8 +62,8 @@ class ChatWebSocketTests {
 
     @Test void handshakeCookieAuthenticatesImmediatelyWithoutAuthFrame() throws Exception {
         WebSocketSession cookieSession = mock(WebSocketSession.class);
-        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-        headers.add(org.springframework.http.HttpHeaders.COOKIE, "vietblog_access_token=cookie-valid");
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.COOKIE, "vietblog_access_token=cookie-valid");
         when(cookieSession.getId()).thenReturn("cookie-session");
         when(cookieSession.isOpen()).thenReturn(true);
         when(cookieSession.getHandshakeHeaders()).thenReturn(headers);

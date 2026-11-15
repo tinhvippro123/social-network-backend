@@ -1,11 +1,12 @@
 package com.vietblog;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 
-@org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "VIETBLOG_CREATE_LOCAL_DATABASE", matches = "true")
+@EnabledIfEnvironmentVariable(named = "VIETBLOG_CREATE_LOCAL_DATABASE", matches = "true")
 public class CreateDbTest {
     @Test
     public void createDatabase() {

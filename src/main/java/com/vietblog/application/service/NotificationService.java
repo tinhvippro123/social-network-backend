@@ -1,5 +1,9 @@
 package com.vietblog.application.service;
 
+import com.vietblog.domain.exception.BusinessRuleException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 import com.vietblog.application.dto.notification.NotificationResponse;
 import com.vietblog.domain.entity.Notification;
 import com.vietblog.domain.entity.User;
@@ -19,8 +23,8 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public Page<NotificationResponse> list(String userId, boolean unreadOnly, int page, int limit) {
-        if (page < 1 || limit < 1 || limit > 100) throw new com.vietblog.domain.exception.BusinessRuleException(ErrorCode.INVALID_INPUT);
-        var pageable = org.springframework.data.domain.PageRequest.of(page - 1, limit, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt", "id"));
+        if (page < 1 || limit < 1 || limit > 100) throw new BusinessRuleException(ErrorCode.INVALID_INPUT);
+        var pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
         return (unreadOnly ? notifications.findByUserIdAndIsReadFalse(userId, pageable)
                 : notifications.findByUserId(userId, pageable)).map(NotificationResponse::from);
     }

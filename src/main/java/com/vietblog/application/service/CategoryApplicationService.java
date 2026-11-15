@@ -19,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -90,8 +91,8 @@ public class CategoryApplicationService {
 
         List<Category> categories = categoryRepository.findAll();
         List<String> categoryIds = categories.stream().map(Category::getId).toList();
-        java.util.Map<String, Long> publishedCounts = categoryIds.isEmpty()
-                ? java.util.Map.of()
+        Map<String, Long> publishedCounts = categoryIds.isEmpty()
+                ? Map.of()
                 : BatchLookup.toCountMap(
                         postRepository.countByCategoryIdsAndStatus(categoryIds, Post.PostStatus.PUBLISHED));
 

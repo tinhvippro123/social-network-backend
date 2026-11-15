@@ -2,6 +2,7 @@ package com.vietblog.presentation.controller;
 
 import com.vietblog.application.dto.ApiResponse;
 import com.vietblog.application.dto.chat.ChatDtos.*;
+import com.vietblog.application.dto.community.CommunityDtos.PublicUser;
 import com.vietblog.application.service.ChatService;
 import com.vietblog.infrastructure.security.UserPrincipal;
 import jakarta.validation.Valid;
@@ -55,7 +56,7 @@ public class ChatController {
         service.preference(id, user.getId(), "hide", true); return ok(null);
     }
     @GetMapping("/blocks")
-    public ApiResponse<List<com.vietblog.application.dto.community.CommunityDtos.PublicUser>> blockedUsers(@AuthenticationPrincipal UserPrincipal user) {
+    public ApiResponse<List<PublicUser>> blockedUsers(@AuthenticationPrincipal UserPrincipal user) {
         return ok(service.blockedUsers(user.getId()));
     }
     @PostMapping("/blocks/{userId}")

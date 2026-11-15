@@ -4,8 +4,10 @@ import com.vietblog.application.service.PostApplicationService;
 import com.vietblog.domain.entity.*;
 import com.vietblog.infrastructure.repository.*;
 import com.vietblog.infrastructure.security.*;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -28,7 +30,7 @@ class PostInteractionIntegrationTest extends VietblogBackendApplicationTests {
     @Autowired BookmarkRepository bookmarks;
     @Autowired JwtTokenProvider jwt;
     @Autowired PostApplicationService postService;
-    @Autowired jakarta.persistence.EntityManager em;
+    @Autowired EntityManager em;
     MockMvc mvc;
     User owner;
     User reader;
@@ -58,7 +60,7 @@ class PostInteractionIntegrationTest extends VietblogBackendApplicationTests {
         mvc.perform(get("/api/posts/{id}/reactions/summary", post.getId())).andExpect(status().isNotFound());
         mvc.perform(post("/api/posts/{id}/upvote", post.getId()).header("Authorization", token(reader))).andExpect(status().isNotFound());
         mvc.perform(get("/api/search").param("q", post.getTitle())).andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
-        assertThat(posts.searchByKeyword("Useful content about Java", org.springframework.data.domain.PageRequest.of(0, 20)).getContent()).doesNotContain(post);
+        assertThat(posts.searchByKeyword("Useful content about Java", PageRequest.of(0, 20)).getContent()).doesNotContain(post);
     }
 
     @Test void bookmarkListIsPrivateAndOmitsHiddenPosts() throws Exception {

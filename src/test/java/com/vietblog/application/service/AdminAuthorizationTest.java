@@ -1,5 +1,6 @@
 package com.vietblog.application.service;
 
+import com.vietblog.domain.entity.User;
 import com.vietblog.domain.service.PostDomainService;
 import com.vietblog.infrastructure.repository.*;
 import jakarta.persistence.EntityManagerFactory;
@@ -39,7 +40,7 @@ class AdminAuthorizationTest {
         AdminService admin = context.getBean(AdminService.class);
         assertThrows(AccessDeniedException.class, admin::stats);
         assertThrows(AccessDeniedException.class,
-                () -> admin.changeRole("target", "member", com.vietblog.domain.entity.User.Role.ADMIN));
+                () -> admin.changeRole("target", "member", User.Role.ADMIN));
         verifyNoInteractions(context.getBean(AdminUserRepository.class));
     }
 

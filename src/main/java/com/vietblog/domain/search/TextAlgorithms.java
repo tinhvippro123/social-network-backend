@@ -1,5 +1,8 @@
 package com.vietblog.domain.search;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -70,7 +73,7 @@ public final class TextAlgorithms {
         for (String resourcePath : resourcePaths) {
             try (var is = TextAlgorithms.class.getResourceAsStream(resourcePath)) {
                 if (is != null) {
-                    try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
+                    try (var reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
                         String line;
                         while ((line = reader.readLine()) != null) {
                             line = line.trim();

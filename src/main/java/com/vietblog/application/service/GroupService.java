@@ -10,6 +10,11 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service @RequiredArgsConstructor @Transactional
 public class GroupService {
@@ -37,13 +42,13 @@ public class GroupService {
         if (groupPage.isEmpty()) {
             return groupPage.map(g -> response(g, viewerId));
         }
-        java.util.List<String> groupIds = groupPage.getContent().stream().map(Group::getId).toList();
-        java.util.Map<String, Long> memberCounts = BatchLookup.toCountMap(members.countByGroupIds(groupIds));
-        java.util.Map<String, Long> postCounts = BatchLookup.toCountMap(posts.countByGroupIds(groupIds));
-        java.util.Map<String, GroupMember> memberships = (viewerId == null || viewerId.isBlank())
-                ? java.util.Map.of()
+        List<String> groupIds = groupPage.getContent().stream().map(Group::getId).toList();
+        Map<String, Long> memberCounts = BatchLookup.toCountMap(members.countByGroupIds(groupIds));
+        Map<String, Long> postCounts = BatchLookup.toCountMap(posts.countByGroupIds(groupIds));
+        Map<String, GroupMember> memberships = (viewerId == null || viewerId.isBlank())
+                ? Map.of()
                 : members.findByGroupIdInAndUserId(groupIds, viewerId).stream()
-                        .collect(java.util.stream.Collectors.toMap(m -> m.getGroup().getId(), m -> m, (a, b) -> a));
+                        .collect(Collectors.toMap(m -> m.getGroup().getId(), m -> m, (a, b) -> a));
 
         return groupPage.map(g -> buildGroupResponse(
                 g,
@@ -140,12 +145,12 @@ public class GroupService {
         if (postPage.isEmpty()) {
             return postPage.map(p -> postResponse(p, userId));
         }
-        java.util.List<String> postIds = postPage.getContent().stream().map(GroupPost::getId).toList();
-        java.util.Map<String, Long> likeCounts = BatchLookup.toCountMap(postLikes.countByPostIds(postIds));
-        java.util.Map<String, Long> commentCounts = BatchLookup.toCountMap(postComments.countByPostIds(postIds));
-        java.util.Set<String> likedPostIds = (userId == null || userId.isBlank())
-                ? java.util.Set.of()
-                : new java.util.HashSet<>(postLikes.findLikedPostIds(userId, postIds));
+        List<String> postIds = postPage.getContent().stream().map(GroupPost::getId).toList();
+        Map<String, Long> likeCounts = BatchLookup.toCountMap(postLikes.countByPostIds(postIds));
+        Map<String, Long> commentCounts = BatchLookup.toCountMap(postComments.countByPostIds(postIds));
+        Set<String> likedPostIds = (userId == null || userId.isBlank())
+                ? Set.of()
+                : new HashSet<>(postLikes.findLikedPostIds(userId, postIds));
 
         return postPage.map(p -> GroupPostResponse.from(
                 p,
@@ -214,7 +219,7 @@ public class GroupService {
     }
 
     @Transactional(readOnly = true)
-    public java.util.List<GroupCommentResponse> getComments(String id, String postId, String userId) {
+    public List<GroupCommentResponse> getComments(String id, String postId, String userId) {
         requireReadable(group(id), userId);
         findPost(id, postId);
         return postComments.findByPostIdOrderByCreatedAtAsc(postId).stream().map(GroupCommentResponse::from).toList();
